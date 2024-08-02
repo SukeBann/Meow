@@ -1,0 +1,28 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Meow", "Meow\Meow.csproj", "{732DED0C-14A6-4F18-99B8-540689A51272}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Meow.Console", "Meow.Console\Meow.Console.csproj", "{7402031E-EE17-4EC0-AC8E-2D00173917DA}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Meow.UI", "Meow.UI\Meow.UI.csproj", "{5941AEEA-9D42-40B1-B7EE-2293893006BA}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{732DED0C-14A6-4F18-99B8-540689A51272}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{732DED0C-14A6-4F18-99B8-540689A51272}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{732DED0C-14A6-4F18-99B8-540689A51272}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{732DED0C-14A6-4F18-99B8-540689A51272}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7402031E-EE17-4EC0-AC8E-2D00173917DA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7402031E-EE17-4EC0-AC8E-2D00173917DA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7402031E-EE17-4EC0-AC8E-2D00173917DA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7402031E-EE17-4EC0-AC8E-2D00173917DA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5941AEEA-9D42-40B1-B7EE-2293893006BA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5941AEEA-9D42-40B1-B7EE-2293893006BA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5941AEEA-9D42-40B1-B7EE-2293893006BA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5941AEEA-9D42-40B1-B7EE-2293893006BA}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
