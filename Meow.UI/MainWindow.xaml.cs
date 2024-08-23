@@ -27,6 +27,7 @@ public partial class MainWindow
         _mainWindowViewModel = new MainWindowViewModel(){IsAutoScroll = true};
         DataContext = _mainWindowViewModel;
         Loaded += OnLoaded;
+        RichTextBox.TextChanged += RichTextBoxExtensions.OnTextChangedAndClear;
     }
 
     private async void OnLoaded(object sender, RoutedEventArgs args)
@@ -46,7 +47,7 @@ public partial class MainWindow
         littleTang.OnBotCaptchaEvent.Subscribe(@event =>
         {
             var (_, botCaptchaEvent) = @event;
-            IOC.GetService<Serilog.ILogger>()?.Information("Bot需要验证码识别: {CaptchaEvent}", botCaptchaEvent.ToString());
+            Ioc.GetService<Serilog.ILogger>()?.Information("Bot需要验证码识别: {CaptchaEvent}", botCaptchaEvent.ToString());
             var captcha = Console.ReadLine();
             var randStr = Console.ReadLine();
             if (captcha != null && randStr != null) littleTang.MeowBot.SubmitCaptcha(captcha, randStr);
@@ -61,25 +62,5 @@ public partial class MainWindow
         littleTang.LoadPlugin(new NeverStopTalkingPlugin());
 
         await littleTang.Login();
-        try
-        {
-        }
-        catch (Exception e)
-        {
-            try
-            {
-                var logger = IOC.GetService<ILogger>();
-                logger?.Error("全局异常捕获:{E}", e);
-            }
-            catch
-            {
-                Console.WriteLine(e.Message);
-                Console.WriteLine(e.StackTrace);
-                return;
-            }
-
-            Console.WriteLine(e.Message);
-            Console.WriteLine(e.StackTrace);
-        }
     }
 }

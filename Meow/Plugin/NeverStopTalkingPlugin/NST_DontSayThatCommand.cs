@@ -8,8 +8,10 @@ namespace Meow.Plugin.NeverStopTalkingPlugin;
 /// <summary>
 /// 为插件<see cref="NeverStopTalkingPlugin"/>添加 违禁词管理功能
 /// </summary>
-public class DontSayThatCommand : IMeowCommand
+public class NstDontSayThatCommand(NstForbiddenWordsManager forbiddenWordsManager) : IMeowCommand
 {
+    private NstForbiddenWordsManager ForbiddenWordsManager { get; } = forbiddenWordsManager;
+
     /// <inheritdoc />
     public string CommandUid => "371EE19D-009A-43F9-A712-4DDF8AD71248";
 
@@ -17,7 +19,7 @@ public class DontSayThatCommand : IMeowCommand
     public string CommandTrigger => "dontSayThat";
 
     /// <inheritdoc />
-    public string CommandPrint => "[dontSayThat] 屏蔽词管理";
+    public string CommandPrint => $"[{CommandTrigger}] 屏蔽词管理";
 
     /// <inheritdoc />
     public bool IsNeedAdmin => true;
@@ -43,31 +45,43 @@ public class DontSayThatCommand : IMeowCommand
         var sender = messageChain.FriendUin;
         var emptyMessage = messageChain.CreateSameTypeMessageBuilder();
 
-        if (args.IsNullOrEmpty())
+        var argsCheck = new CommandArgsCheckUtil(messageChain, args);
+        var checkResult = argsCheck
+            .SplitArgsAndCheckLength(' ', 2, "参数数量错误, 请检查参数格式")
+            .ArgListMatch(0, ["add", "remove"])
+            .ArgListLength(1, 4, 1)
+            .IsSuccess(out var msg, out var errorMessageChain, out var arg, out var splitResult);
+
+        if (!checkResult)
         {
-            emptyMessage.Text("命令参数不能为空");
-            emptyMessage.Build();
-            return (true, emptyMessage.Build());
+            return (true, errorMessageChain);
         }
 
-        var splitArgs = args!.Split(' ', 2);
-        if (splitArgs is not ["add" or "remove", _] && splitArgs[1].Length is >= 1 and <= 4)
-        {
-            emptyMessage.Text("参数错误, 第1个参数必须是add或者remove, 第二个参数违禁词的长度必须大于等于1 小于等于4");
-            emptyMessage.Build();
-            return (true, emptyMessage.Build());
-        }
+        // TODO 检查上面的参数检查类是否正常工作
+        // if (args.IsNullOrEmpty())
+        // {
+        //     emptyMessage.Text("命令参数不能为空");
+        //     emptyMessage.Build();
+        //     return (true, emptyMessage.Build());
+        // }
+        //
+        // var splitArgs = args!.Split(' ', 2);
+        // if (splitArgs is not ["add" or "remove", _] && splitArgs[1].Length is >= 1 and <= 4)
+        // {
+        //     emptyMessage.Text("参数错误, 第1个参数必须是add或者remove, 第二个参数违禁词的长度必须大于等于1 小于等于4");
+        //     emptyMessage.Build();
+        //     return (true, emptyMessage.Build());
+        // }
 
-        var action = splitArgs[0];
-        var forbiddenWord = splitArgs[1];
-        var manager = new ForbiddenWordsManager(meow, sender);
+        var action = splitResult[0];
+        var forbiddenWord = splitResult[1];
         if (action == "add")
         {
-            manager.AddForbiddenWord(forbiddenWord);
+            ForbiddenWordsManager.AddForbiddenWord(forbiddenWord, sender);
         }
         else
         {
-            manager.RemoveForbiddenWord(forbiddenWord);
+            ForbiddenWordsManager.RemoveForbiddenWord(forbiddenWord);
         }
 
         emptyMessage.Text($"命令已执行 {(action == "add" ? "添加" : "删除")}违禁词: {forbiddenWord}");

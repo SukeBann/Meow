@@ -1,4 +1,5 @@
 ﻿using Meow.Core;
+using Meow.Core.Model.Base;
 
 namespace Meow.Plugin.HelpPlugin;
 

@@ -1,16 +1,13 @@
-﻿using LiteDB;
-using Meow.Core.Enum;
+﻿using Meow.Core.Enum;
+using Meow.Core.Model.Base;
 
 namespace Meow.Core.Model;
 
 /// <summary>
 /// 用户信息
 /// </summary>
-public class UserInfo(uint uin, UserPermission userPermission)
+public class UserInfo(uint uin, UserPermission userPermission): DatabaseRecordBase
 {
-    [BsonId]
-    public int DbId { get; set; }
-    
     /// <summary>
     /// uid 俗称qq号
     /// </summary>
@@ -20,9 +17,4 @@ public class UserInfo(uint uin, UserPermission userPermission)
     /// 权限等级
     /// </summary>
     public UserPermission UserPermission { get; set; } = userPermission;
-
-    /// <summary>
-    /// 是否被删除
-    /// </summary>
-    public bool HasDelete { get; set; }
 }

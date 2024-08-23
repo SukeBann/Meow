@@ -18,20 +18,27 @@ public static class LoggerCreator
     /// <summary>
     /// 暴露给其他程序集处理log config
     /// </summary>
-    public static Func<LoggerConfiguration, LoggerConfiguration> EditLoggerConfigurationInterface { get; set; }
+    public static Func<LoggerConfiguration, LoggerConfiguration>? EditLoggerConfigurationInterface { get; set; }
 
     public static LoggerConfiguration GenerateLoggerConfig(string customFilePath)
     {
         var logFilePath = CheckAndCreateDirectory(customFilePath, "MeowLog.log");
         var loggerConfiguration = new LoggerConfiguration()
-            .WriteTo.File(logFilePath, rollingInterval: RollingInterval.Hour)
+            .WriteTo.File(logFilePath,
+                rollingInterval: RollingInterval.Hour,
+                rollOnFileSizeLimit: true,
+                fileSizeLimitBytes: 2 * 1024 * 1024, 
+                retainedFileCountLimit: 10)
             .MinimumLevel.Information();
 #if DEBUG
         loggerConfiguration.MinimumLevel.Debug()
             .WriteTo.Console()
             .WriteTo.Debug();
 #endif
-        loggerConfiguration = EditLoggerConfigurationInterface?.Invoke(loggerConfiguration) ?? throw new Exception("创建日志失败");
+        if (EditLoggerConfigurationInterface is not null)
+        {
+            loggerConfiguration = EditLoggerConfigurationInterface.Invoke(loggerConfiguration);
+        }
         return loggerConfiguration;
     }
 }

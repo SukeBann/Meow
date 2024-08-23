@@ -12,7 +12,7 @@ public class EditPermissionCommand : IMeowCommand
     public string CommandTrigger => "permission";
     
     /// <inheritdoc />
-    public string CommandPrint => "[permission] 权限管理";
+    public string CommandPrint => $"[{CommandTrigger}] 权限管理";
 
     /// <inheritdoc />
     public string CommandHelpDescription => """

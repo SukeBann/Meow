@@ -32,6 +32,7 @@
                 Background="#36AAF7"
                 Content="自动滚动: 关"
                 pu:ToggleButtonHelper.CheckedContent="自动滚动: 开"
+                FocusVisualStyle="{x:Null}"
                 Foreground="#FFFFFF"
                 IsChecked="{Binding IsAutoScroll, Mode=TwoWay}" />
         </Grid>
@@ -39,6 +40,8 @@
             <RichTextBox
                 x:Name="RichTextBox"
                 utils1:RichTextBoxExtensions.AutoScrollToEnd="{Binding IsAutoScroll}"
+                VerticalScrollBarVisibility="Visible"
+                BorderThickness="0"
                 Background="#1F1F28"
                 FontSize="15"
                 IsReadOnly="True" />

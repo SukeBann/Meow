@@ -28,7 +28,7 @@ internal class Program
             littleTang.OnBotCaptchaEvent.Subscribe(@event =>
             {
                 var (_, botCaptchaEvent) = @event;
-                IOC.GetService<Serilog.ILogger>()?.Information("Bot需要验证码识别: {CaptchaEvent}", botCaptchaEvent.ToString());
+                Ioc.GetService<Serilog.ILogger>()?.Information("Bot需要验证码识别: {CaptchaEvent}", botCaptchaEvent.ToString());
                 var captcha = System.Console.ReadLine();
                 var randStr = System.Console.ReadLine();
                 if (captcha != null && randStr != null) littleTang.MeowBot.SubmitCaptcha(captcha, randStr);
@@ -47,7 +47,7 @@ internal class Program
         {
             try
             {
-                var logger = IOC.GetService<ILogger>();
+                var logger = Ioc.GetService<ILogger>();
                 logger?.Error("全局异常捕获", e);
             }
             catch

@@ -1,14 +1,12 @@
-﻿using LiteDB;
+﻿using Meow.Core.Model.Base;
 
 namespace Meow.Core.Model;
 
 /// <summary>
 /// 插件权限
 /// </summary>
-public class PluginPermission(bool isNeedAdminPermission, string uid, string pluginName)
+public class PluginPermission(bool isNeedAdminPermission, string uid, string pluginName): DatabaseRecordBase
 {
-    [BsonId] public int DbId { get; set; }
-
     /// <summary>
     /// 是否需要管理员权限
     /// </summary>

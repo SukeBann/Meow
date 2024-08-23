@@ -113,7 +113,7 @@ public partial class Meow
     /// <param name="commandTrigger">命令触发文, 返回值为null的时候可能为null</param>
     /// <param name="args">命令参数, 无论是否成功都可能为null</param>
     /// <returns></returns>
-    public bool TryParseCommand(MessageChain messageChain,
+    private bool TryParseCommand(MessageChain messageChain,
         [MaybeNullWhen(false)] out string commandTrigger,
         out string? args)
     {

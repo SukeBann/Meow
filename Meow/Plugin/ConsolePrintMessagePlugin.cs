@@ -3,6 +3,7 @@ using System.Reactive.Linq;
 using Lagrange.Core.Event;
 using Lagrange.Core.Message;
 using Meow.Core;
+using Meow.Core.Model.Base;
 using ArgumentOutOfRangeException = System.ArgumentOutOfRangeException;
 
 namespace Meow.Plugin;
@@ -55,8 +56,8 @@ public class ConsolePrintMessagePlugin : PluginBase
                 $"G[{groupGroupName}]-[{memberName}]{Environment.NewLine}{messageChain.ToPreviewString()}{Environment.NewLine}",
             MessageChain.MessageType.Temp =>
                 $"T[{groupGroupName}]-[{memberName}|{friendName}]{Environment.NewLine}{messageChain.ToPreviewString()}{Environment.NewLine}",
-            MessageChain.MessageType.Friend => $"F[[{friendName}]{Environment.NewLine}{messageChain.ToPreviewString()}{Environment.NewLine}",
-            _ => throw new ArgumentOutOfRangeException("未知的消息类型, 无法正确解析")
+            MessageChain.MessageType.Friend => $"F[{friendName}]{Environment.NewLine}{messageChain.ToPreviewString()}{Environment.NewLine}",
+            _ => throw new ArgumentOutOfRangeException(nameof(messageType), "未知的消息类型, 无法正确解析")
         };
         meow.Info(output);
     }

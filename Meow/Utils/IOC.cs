@@ -2,7 +2,7 @@
 
 namespace Meow.Utils;
 
-public class IOC
+public class Ioc
 {
     /// <summary>
     /// Autofac依赖注入静态服务

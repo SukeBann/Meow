@@ -3,6 +3,7 @@ using Lagrange.Core.Message;
 using Masuit.Tools;
 using Meow.Core;
 using Meow.Utils;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
 
 namespace Meow.Plugin.HelpPlugin;
 
@@ -24,7 +25,7 @@ public class HelpCommand : IMeowCommand
     public string CommandTrigger => "help";
 
     /// <inheritdoc />
-    public string CommandPrint => "[help] 获取命令帮助";
+    public string CommandPrint => $"[{CommandTrigger}] 获取命令帮助";
 
     /// <inheritdoc />
     public string CommandHelpDescription => """
@@ -49,14 +50,24 @@ public class HelpCommand : IMeowCommand
             return (true, GetHelpAll(meow, messageChain));
         }
 
-        // TODO 暂时不实现查询单个命令的功能
-        return (false, GetHelpAll(meow, messageChain));
+        var isSuccess = new CommandArgsCheckUtil(messageChain, args)
+            .IsSuccess(out var message, out var chain, out var argStr, out var argList);
+        if (!isSuccess)
+        {
+            return (true, messageChain.CreateSameTypeTextMessage(message));
+        }
+
+        var target = meow.Plugins.SelectMany(x => x.Commands)
+            .FirstOrDefault(x => x.CommandTrigger == argStr);
+        return target is null
+            ? (true, messageChain.CreateSameTypeTextMessage($"未查询到命令{argStr}"))
+            : (true, messageChain.CreateSameTypeTextMessage(target.CommandHelpDescription));
     }
 
     /// <summary>
     /// 获取无参数的help命令结果
     /// </summary>
-    public MessageChain GetHelpAll(Core.Meow meow, MessageChain messageChain)
+    private MessageChain GetHelpAll(Core.Meow meow, MessageChain messageChain)
     {
         // ReSharper disable once InvertIf
         if (AllCommandHelpCache.IsNullOrEmpty() || meow.PluginChangeSeed != AllCommandHelpCacheSeed)
@@ -77,6 +88,6 @@ public class HelpCommand : IMeowCommand
             AllCommandHelpCacheSeed = meow.PluginChangeSeed;
         }
 
-        return messageChain.CreateSameTypeMessageBuilder().Text(AllCommandHelpCache!).Build();
+        return messageChain.CreateSameTypeTextMessage(AllCommandHelpCache!);
     }
 }

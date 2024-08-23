@@ -3,7 +3,7 @@ using System.Reactive.Linq;
 using Lagrange.Core.Event;
 using Lagrange.Core.Message;
 
-namespace Meow.Core;
+namespace Meow.Core.Model.Base;
 
 public abstract class PluginBase : IMeowPlugin
 {

@@ -56,7 +56,7 @@ public class MeowBootstrapper
             throw new InvalidOperationException($"请不要重复初始化{nameof(MeowBootstrapper)}");
         }
         ConfigurationServices();
-        var meowBootstrapper = new MeowBootstrapper(IOC.GetService<ILogger>());
+        var meowBootstrapper = new MeowBootstrapper(Ioc.GetService<ILogger>());
         IsInit = true;
         return meowBootstrapper;
     }
@@ -68,7 +68,7 @@ public class MeowBootstrapper
     {
         ContainerBuilder builder = new();
 
-        var currentDomainBaseDirectory = AppDomain.CurrentDomain.BaseDirectory;
+        var currentDomainBaseDirectory = StaticValue.AppCurrentPath;
         var logger = LoggerCreator.GenerateLoggerConfig(currentDomainBaseDirectory)
             .CreateLogger();
         logger.Information("全局日志模块加载完毕");
@@ -77,7 +77,7 @@ public class MeowBootstrapper
         var meowDatabase = new MeowDatabase(currentDomainBaseDirectory, "MeowDb", logger);
         builder.RegisterInstance(meowDatabase).As<MeowDatabase>().SingleInstance();
 
-        IOC.Container = builder.Build();
+        Ioc.Container = builder.Build();
     }
 
     #endregion

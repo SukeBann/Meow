@@ -20,4 +20,22 @@ public static class MessageChainExtend
             _ => throw new ArgumentOutOfRangeException("无法识别的消息链类型, 无法构建消息链")
         };
     }
+
+    /// <summary>
+    /// 创建一个消息链类型相同的单文本消息, 消息目标与源消息发送者相同
+    /// </summary>
+    /// <param name="messageChain">源消息链</param>
+    /// <exception cref="ArgumentOutOfRangeException"></exception>
+    /// <returns></returns>
+    public static MessageChain CreateSameTypeTextMessage(this MessageChain messageChain, string text)
+    {
+        var messageBuilder = messageChain.Type switch
+        {
+            MessageChain.MessageType.Group => MessageBuilder.Group(messageChain.GroupUin ?? 0),
+            MessageChain.MessageType.Temp or MessageChain.MessageType.Friend => MessageBuilder.Friend(messageChain
+                .FriendUin),
+            _ => throw new ArgumentOutOfRangeException("无法识别的消息链类型, 无法构建消息链")
+        };
+        return messageBuilder.Text(text).Build();
+    }
 }

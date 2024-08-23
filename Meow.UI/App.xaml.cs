@@ -20,7 +20,7 @@ public partial class App : Application
         e.Handled = true;
         try
         {
-            var logger = IOC.GetService<ILogger>();
+            var logger = Ioc.GetService<ILogger>();
             if (logger is null)
             {
                 MessageBox.Show(exceptionMessage, "Error", MessageBoxButton.OK, MessageBoxImage.Error);

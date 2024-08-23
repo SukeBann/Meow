@@ -1,12 +1,9 @@
-﻿using LiteDB;
+﻿using Meow.Core.Model.Base;
 
 namespace Meow.Core.Model;
 
-public class CommandPermission(bool isNeedAdminPermission, string commandName, string commandUid)
+public class CommandPermission(bool isNeedAdminPermission, string commandName, string commandUid): DatabaseRecordBase
 {
-    [BsonId]
-    public int DbId { get; set; }
-    
     /// <summary>
     /// 是否需要管理员权限
     /// </summary>

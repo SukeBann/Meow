@@ -10,11 +10,11 @@ public partial class Meow
     /// <summary>
     /// 用户信息数据库集合
     /// </summary>
-    private const string UserInfoCollection = nameof(UserInfoCollection);
+    private const string MeowUserInfoCollection = nameof(MeowUserInfoCollection);
     /// <summary>
     /// 插件权限数据库集合
     /// </summary>
-    private const string PluginPermissionCollection = nameof(PluginPermissionCollection);
+    private const string MeowPluginPermissionCollection = nameof(MeowPluginPermissionCollection);
 
     /// <summary>
     /// key为uid 用户信息
@@ -60,7 +60,7 @@ public partial class Meow
         }
 
         Info("添加一条新的插件权限信息到数据库");
-        Database.Db.Insert(pluginPermission, PluginPermissionCollection);
+        Database.Insert(pluginPermission, MeowPluginPermissionCollection);
     }
 
     /// <summary>
@@ -68,7 +68,7 @@ public partial class Meow
     /// </summary>
     private void LoadPluginPermissionFromDb()
     {
-        foreach (var pluginPermission in Database.Db.Query<PluginPermission>(PluginPermissionCollection).ToList())
+        foreach (var pluginPermission in Database.Query<PluginPermission>(MeowPluginPermissionCollection).ToList())
         {
             PluginPermissionDict.Add(pluginPermission.Uid, pluginPermission);
             CommandPermissionDict.AddRange(pluginPermission.CommandPermissions);
@@ -80,7 +80,7 @@ public partial class Meow
     /// </summary>
     private void LoadUserInfoFromDb()
     {
-        var userInfos = Database.Db.Query<UserInfo>(UserInfoCollection)
+        var userInfos = Database.Query<UserInfo>(MeowUserInfoCollection)
             .Where(x => !x.HasDelete).ToList();
         if (userInfos.Count < 1)
         {
@@ -103,12 +103,12 @@ public partial class Meow
             return user;
         }
         var userInfo = new UserInfo(uin, UserPermission.User);
-        if (Database.Db.Query<UserInfo>(UserInfoCollection)
+        if (Database.Query<UserInfo>(MeowUserInfoCollection)
                 .Where(x => !x.HasDelete)
                 .Where(x => x.Uin == uin)
                 .FirstOrDefault() is null)
         {
-            Database.Db.Insert(userInfo, UserInfoCollection);
+            Database.Insert(userInfo, MeowUserInfoCollection);
         }
         UserInfoDict.Add(user.Uin, user);
         
@@ -214,7 +214,7 @@ public partial class Meow
     {
         var userInfo = GetUser(uin);
         userInfo.UserPermission = permission;
-        Database.Db.Update(userInfo, UserInfoCollection);
+        Database.Update(userInfo, MeowUserInfoCollection);
     }
 
     /// <summary>
@@ -267,7 +267,7 @@ public partial class Meow
             }
         }
 
-        Database.Db.Update(pluginPermission, PluginPermissionCollection);
+        Database.Update(pluginPermission, MeowPluginPermissionCollection);
     }
 
 
@@ -321,6 +321,6 @@ public partial class Meow
             }
         }
 
-        Database.Db.Update(pluginPermission, PluginPermissionCollection);
+        Database.Update(pluginPermission, MeowPluginPermissionCollection);
     }
 }
