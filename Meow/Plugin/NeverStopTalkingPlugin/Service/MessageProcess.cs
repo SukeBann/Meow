@@ -1,4 +1,5 @@
-﻿using System.Text.RegularExpressions;
+﻿using System.Text;
+using System.Text.RegularExpressions;
 using Castle.Core.Logging;
 using JiebaNet.Segmenter;
 using Lagrange.Core.Message;
@@ -70,7 +71,15 @@ public partial class MessageProcess : HostDatabaseSupport
     /// </summary>
     private List<BagOfWordVector> MessageVectorList { get; set; } = new();
 
+    /// <summary>
+    /// 匹配纯英文或数字
+    /// </summary>
     private Regex MatchEnglishAndNumbers { get; set; } = En_Num_Pattern();
+
+    /// <summary>
+    /// 匹配表情
+    /// </summary>
+    private readonly Regex EmojiPattern = GEmojiPattern();
 
     #endregion
 
@@ -85,7 +94,7 @@ public partial class MessageProcess : HostDatabaseSupport
         {
             return (false, messageChain);
         }
-        
+
         var textMessage = ParseTextMessage(messageChain);
         if (textMessage.IsNullOrEmpty())
         {
@@ -96,15 +105,16 @@ public partial class MessageProcess : HostDatabaseSupport
             .Where(x => !StopWord.Contains(x))
             .Where(x => !ForbiddenWordsManager.CheckForbiddenWordsManager(x))
             .ToList();
-        
+
         // 移除空格 空字符 只有数字或者英文的字符
-        filterResult.RemoveWhere(x => x.IsNullOrEmpty() || string.IsNullOrWhiteSpace(x) || MatchEnglishAndNumbers.IsMatch(x));
-        
+        filterResult.RemoveWhere(x =>
+            x.IsNullOrEmpty() || string.IsNullOrWhiteSpace(x) || MatchEnglishAndNumbers.IsMatch(x));
+
         if (filterResult.Count < 1)
         {
             return (false, messageChain);
         }
-        
+
         Host.Info($"分词筛选后结果: {string.Join(",", filterResult)}");
         // 计算完消息向量, 先保存
         var msgRecord = BagOfWordManager.ProcessCutResult(messageChain, textMessage, filterResult);
@@ -135,6 +145,7 @@ public partial class MessageProcess : HostDatabaseSupport
             // TODO 测试用
             return (true, messageChain.CreateSameTypeTextMessage(textMsg));
         }
+
         return (false, messageChain.CreateSameTypeTextMessage(textMsg));
     }
 
@@ -147,7 +158,7 @@ public partial class MessageProcess : HostDatabaseSupport
         //TODO 之后改成定时加载
         LoadAllMessageVector();
         MessageVectorList.RemoveWhere(x => x.MsgId == msgRecord.DbId);
-        
+
         var totalResult = new List<(double similarity, int msgId)>();
         foreach (var (bowId, vector) in msgRecord.WordVector)
         {
@@ -191,13 +202,15 @@ public partial class MessageProcess : HostDatabaseSupport
     /// <returns></returns>
     private string ParseTextMessage(MessageChain messageChain)
     {
-        return string.Join(" ",
+        var rawData = string.Join(" ",
                 messageChain.Where(x => x is TextEntity)
                     .Select(x => x.ToPreviewText()))
             .Trim()
             .Replace(Environment.NewLine, "")
             .Replace("\r", "")
             .Replace("\n", "");
+
+        return EmojiPattern.Replace(rawData, string.Empty);
     }
 
     /// <summary>
@@ -244,4 +257,6 @@ public partial class MessageProcess : HostDatabaseSupport
 
     [GeneratedRegex(@"^[a-zA-Z0-9]+$")]
     private static partial Regex En_Num_Pattern();
+    [GeneratedRegex(@"[\uD800-\uDBFF][\uDC00-\uDFFF]|[\u2600-\u26FF]|[\u2700-\u27BF]|[\uE000-\uF8FF]|[\u2100-\u214F]|[\u203C\u2049]", RegexOptions.Compiled)]
+    private static partial Regex GEmojiPattern();
 }

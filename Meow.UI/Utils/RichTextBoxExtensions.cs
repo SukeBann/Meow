@@ -44,7 +44,7 @@ public static class RichTextBoxExtensions
     /// <summary>
     /// 最大字符数量
     /// </summary>
-    private const int MaxCharCount = 40000;
+    private const int MaxCharCount = 100000;
 
     public static void OnTextChangedAndClear(object sender, TextChangedEventArgs e)
     {
