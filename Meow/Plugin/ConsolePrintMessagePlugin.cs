@@ -1,5 +1,6 @@
 ﻿using System.Reactive.Concurrency;
 using System.Reactive.Linq;
+using System.Text.RegularExpressions;
 using Lagrange.Core.Event;
 using Lagrange.Core.Message;
 using Meow.Core;
@@ -59,7 +60,16 @@ public class ConsolePrintMessagePlugin : PluginBase
             MessageChain.MessageType.Friend => $"F[{friendName}]{Environment.NewLine}{messageChain.ToPreviewString()}{Environment.NewLine}",
             _ => throw new ArgumentOutOfRangeException(nameof(messageType), "未知的消息类型, 无法正确解析")
         };
-        meow.Info(output);
+        const string pattern = @"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]+";
+        output = Regex.Replace(output, pattern, string.Empty);
+        try
+        {
+            meow.Info(output);
+        }
+        catch (Exception e)
+        {
+            meow.Error("插入日志失败");
+        }
     }
 
     /// <inheritdoc />

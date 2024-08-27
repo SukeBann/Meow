@@ -1,22 +1,18 @@
-﻿using System.Collections;
-using System.ComponentModel;
-using System.Diagnostics.CodeAnalysis;
+﻿using System.Collections.Concurrent;
 using Lagrange.Core.Message;
 using Masuit.Tools;
-using Masuit.Tools.Reflection;
 using Meow.Core.Model.Base;
 using Meow.Plugin.NeverStopTalkingPlugin.Models;
-using Newtonsoft.Json.Serialization;
 
-namespace Meow.Plugin.NeverStopTalkingPlugin;
+namespace Meow.Plugin.NeverStopTalkingPlugin.Service;
 
 /// <summary>
 /// 词袋管理器
 /// </summary>
-public class NstBagOfWordManager : HostDatabaseSupport
+public class BagOfWordManager : HostDatabaseSupport
 {
     /// <inheritdoc />
-    public NstBagOfWordManager(Core.Meow host) : base(host)
+    public BagOfWordManager(Core.Meow host) : base(host)
     {
         Init();
     }
@@ -87,7 +83,9 @@ public class NstBagOfWordManager : HostDatabaseSupport
             return false;
         }
 
-        var bagOfWordRecord = new BagOfWordRecord(GroupBowMaxCount,
+        var bagOfWordRecord = new BagOfWordRecord(bagOfWordType is BagOfWordType.Global or BagOfWordType.Group
+                ? GroupBowMaxCount
+                : PersonalBowMaxCount,
             bagOfWordType is BagOfWordType.Global ? 0 : uin,
             bagOfWordType);
 
@@ -180,7 +178,7 @@ public class NstBagOfWordManager : HostDatabaseSupport
         var msgRecord = new MsgRecord(messageChain, textMessage, filterResult, senderId, groupId);
         // 尝试填充词袋
         TryFillBagWordRecord(filterResult, senderId, groupId);
-        // 寻找最相似消息
+        // 计算所有对应词袋的词向量
         return GetAllBagOfWordsVectors(msgRecord);
     }
 
@@ -197,8 +195,16 @@ public class NstBagOfWordManager : HostDatabaseSupport
         {
             if (!msgRecord.WordVector.TryGetValue(global.DbId, out var vector) || vector is null)
             {
-                var calculationResult = CalculateWordVector(filterResult, global);
-                msgRecord.WordVector[global.DbId] = calculationResult;
+                // TODO 全局词袋先只收集特定群
+                if (msgRecord.IsGroupMsg)
+                {
+                    var valid = new uint[] {726070631, 587914615};
+                    if (valid.Contains(msgRecord.GroupId))
+                    {
+                        var calculationResult = CalculateWordVector(filterResult, global);
+                        msgRecord.WordVector[global.DbId] = calculationResult;
+                    }
+                }
             }
         }
 
@@ -225,33 +231,6 @@ public class NstBagOfWordManager : HostDatabaseSupport
         }
 
         return msgRecord;
-
-        // var random = new Random();
-        //
-        // var weightList = new List<int>();
-        // var globalWeight = GetUniqueRandomNumber(random, randomMaxCount, weightList);
-        // var personalWeight = GetUniqueRandomNumber(random, randomMaxCount, weightList);
-        // var groupWeight = GetUniqueRandomNumber(random, randomMaxCount, weightList);
-        //
-        // // 最低相似度
-        // const double similarityThreshold = 0.8d;
-        // // 最相似的消息
-        // var similarMsg = string.Empty;
-        // // 最高相似度
-        // var cosineSimilarity = 0d;
-        //
-        // // 获取一个随机数 并与列表中的任何一个数都不相等
-        // int GetUniqueRandomNumber(Random seed, int maxCount, List<int> uniqueNumbers)
-        // {
-        //     int number;
-        //     do
-        //     {
-        //         number = seed.Next(maxCount);
-        //     } while (uniqueNumbers.Contains(number));
-        //
-        //     uniqueNumbers.Add(number);
-        //     return number;
-        // }
     }
 
     /// <summary>
@@ -262,7 +241,7 @@ public class NstBagOfWordManager : HostDatabaseSupport
     /// <returns>代表词向量的列表, 目前是byte类型 存储范围0-255</returns>
     /// <exception cref="ArgumentNullException">当词袋记录或单词列表为空时抛出异常</exception>
     /// <exception cref="InvalidOperationException">当词袋没有填满时抛出异常</exception>
-    private List<byte> CalculateWordVector(List<string> words, BagOfWordRecord bagOfWordRecord)
+    private double[] CalculateWordVector(List<string> words, BagOfWordRecord bagOfWordRecord)
     {
         if (bagOfWordRecord == null)
         {
@@ -279,7 +258,7 @@ public class NstBagOfWordManager : HostDatabaseSupport
             throw new InvalidOperationException("无法使用没有填满的词袋进行词向量计算");
         }
 
-        var vector = new byte[bagOfWordRecord.MaxCount];
+        var vector = new double[bagOfWordRecord.MaxCount];
         var wordSet = new HashSet<string>(words); // 使用 HashSet 优化查找速度
 
         foreach (var (word, index) in bagOfWordRecord.BagOfWord)
@@ -290,7 +269,7 @@ public class NstBagOfWordManager : HostDatabaseSupport
             }
         }
 
-        return vector.ToList();
+        return vector;
     }
 
     /// <summary>
@@ -307,8 +286,17 @@ public class NstBagOfWordManager : HostDatabaseSupport
         if (BagOfWordRecordList.FirstOrDefault(x => x.BagOfWordType == BagOfWordType.Global)
             is {Uin: 0, IsFull: false} global)
         {
-            global.TryAddBagOfWord(filterResult);
-            changeList.Add(global);
+            if (groupId != 0)
+            {
+                var valid = new uint[] {726070631, 587914615};
+                if (valid.Contains(groupId ?? 0))
+                {
+                    if (global.TryAddBagOfWord(filterResult) > 0)
+                    {
+                        changeList.Add(global);
+                    }
+                }
+            }
         }
 
         // 如果存在群词袋则尝试往里面添加
@@ -316,8 +304,10 @@ public class NstBagOfWordManager : HostDatabaseSupport
             && BagOfWordRecordList.FirstOrDefault(x => x.BagOfWordType is BagOfWordType.Group && x.Uin == groupId)
                 is { } bagOfWordRecord)
         {
-            bagOfWordRecord.TryAddBagOfWord(filterResult);
-            changeList.Add(bagOfWordRecord);
+            if (bagOfWordRecord.TryAddBagOfWord(filterResult) > 0)
+            {
+                changeList.Add(bagOfWordRecord);
+            }
         }
 
         // 如果存在个人袋则尝试往里面添加
@@ -325,11 +315,18 @@ public class NstBagOfWordManager : HostDatabaseSupport
                 .FirstOrDefault(x => x.BagOfWordType is BagOfWordType.Personal && x.Uin == senderId)
             is { } personalRecord)
         {
-            personalRecord.TryAddBagOfWord(filterResult);
-            changeList.Add(personalRecord);
+            if (personalRecord.TryAddBagOfWord(filterResult) > 0)
+            {
+                changeList.Add(personalRecord);
+            }
         }
 
-        Update(changeList, NstBagOfWordManagerCollection);
+        if (changeList.Count > 0)
+        {
+            Host.Info(
+                $"需要更新的词袋：{string.Join(", ", changeList.Select(x => $"[{x.BagOfWordType} {x.Uin} {x.BagOfWord.Count}]"))}");
+            UpdateCollection(changeList, NstBagOfWordManagerCollection);
+        }
     }
 
     #endregion

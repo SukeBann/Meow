@@ -1,6 +1,8 @@
 ﻿using Meow.Core;
 using Meow.Core.Model.Base;
+using Meow.Plugin.NeverStopTalkingPlugin.Command;
 using Meow.Plugin.NeverStopTalkingPlugin.Models;
+using Meow.Plugin.NeverStopTalkingPlugin.Service;
 
 namespace Meow.Plugin.NeverStopTalkingPlugin;
 
@@ -43,33 +45,43 @@ public class NeverStopTalkingPlugin : PluginBase
     /// <summary>
     /// 违禁词管理器
     /// </summary>
-    private NstForbiddenWordsManager ForbiddenWordsManager { get; set; }
+    private ForbiddenWordsManager ForbiddenWordsManager { get; set; }
     
     /// <summary>
     /// 消息处理器
     /// </summary>
-    private NstMessageProcess? MessageProcess { get; set; }
+    private MessageProcess? MessageProcess { get; set; }
 
     /// <inheritdoc />
     public override List<IMeowCommand> Commands { get; } = new(){};
 
+    private IDisposable MessageProcessDisposable { get; set; }
+
     /// <inheritdoc />
     public override void InjectPlugin(Core.Meow host)
     {
-        ForbiddenWordsManager = new NstForbiddenWordsManager(host);
-        var nstBagOfWordManager = new NstBagOfWordManager(host);
+        base.InjectPlugin(host);
+        ForbiddenWordsManager = new ForbiddenWordsManager(host);
+        var nstBagOfWordManager = new BagOfWordManager(host);
 
         Commands.Add(new NstDontSayThatCommand(ForbiddenWordsManager));
-        Commands.Add(new NstBagOfWordCommand(host, nstBagOfWordManager));
+        Commands.Add(new BagOfWordCommand(host, nstBagOfWordManager));
         
-        MessageProcess = new NstMessageProcess(ForbiddenWordsManager, nstBagOfWordManager, host);
-        
-        base.InjectPlugin(host);
+        MessageProcess = new MessageProcess(ForbiddenWordsManager, nstBagOfWordManager, host);
+        MessageProcessDisposable = Host!.OnMessageReceived.Subscribe(async x =>
+        {
+            var (isSendBack, messageChain) = MessageProcess.ProcessMessage(x.messageChain);
+            if (isSendBack)
+            {
+                await Host.SendMessage(messageChain);
+            }
+        });
     }
 
     /// <inheritdoc />
     public override void Remove()
     {
-        throw new NotImplementedException();
+        MessageProcessDisposable.Dispose();
+        base.Remove();
     }
 }

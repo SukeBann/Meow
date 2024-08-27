@@ -1,5 +1,5 @@
-﻿using System.Collections.Concurrent;
-using System.Reflection.Metadata.Ecma335;
+﻿using System.Text.RegularExpressions;
+using Castle.Core.Logging;
 using JiebaNet.Segmenter;
 using Lagrange.Core.Message;
 using Lagrange.Core.Message.Entity;
@@ -7,8 +7,9 @@ using Masuit.Tools;
 using Meow.Core.Model.Base;
 using Meow.Plugin.NeverStopTalkingPlugin.Models;
 using Meow.Utils;
+using Serilog;
 
-namespace Meow.Plugin.NeverStopTalkingPlugin;
+namespace Meow.Plugin.NeverStopTalkingPlugin.Service;
 
 /// <summary>
 /// 消息处理, 接收插件处理到的消息
@@ -23,10 +24,11 @@ namespace Meow.Plugin.NeverStopTalkingPlugin;
 /// <br/> 词袋处理器会返回一个结果, 如果词袋未被填充完成 则该消息只会被存储, 并且用于扩充词袋 不会被响应
 /// <br/> 否则词袋会返回一条消息向量, 消息处理器可以使用消息向量去查找最相似的消息
 /// </summary>
-public class NstMessageProcess : HostDatabaseSupport
+public partial class MessageProcess : HostDatabaseSupport
 {
     /// <inheritdoc />
-    public NstMessageProcess(NstForbiddenWordsManager forbiddenWordsManager, NstBagOfWordManager bagOfWordManager, Core.Meow host) : base(host)
+    public MessageProcess(ForbiddenWordsManager forbiddenWordsManager, BagOfWordManager bagOfWordManager,
+        Core.Meow host) : base(host)
     {
         ForbiddenWordsManager = forbiddenWordsManager;
         BagOfWordManager = bagOfWordManager;
@@ -35,7 +37,7 @@ public class NstMessageProcess : HostDatabaseSupport
         StopWord = [];
         _ = LoadStopWord();
     }
-    
+
     #region Properties
 
     /// <summary>
@@ -46,12 +48,12 @@ public class NstMessageProcess : HostDatabaseSupport
     /// <summary>
     /// 违禁词管理器
     /// </summary>
-    private NstForbiddenWordsManager ForbiddenWordsManager { get; set; }
-    
+    private ForbiddenWordsManager ForbiddenWordsManager { get; set; }
+
     /// <summary>
     /// 词袋管理器
     /// </summary>
-    private NstBagOfWordManager BagOfWordManager { get; set; }
+    private BagOfWordManager BagOfWordManager { get; set; }
 
     /// <summary>
     /// 停用词
@@ -59,12 +61,19 @@ public class NstMessageProcess : HostDatabaseSupport
     private HashSet<string> StopWord { get; set; }
 
     /// <summary>
+    /// 分词器
+    /// </summary>
+    private JiebaSegmenter WordCutter { get; set; } = new();
+
+    /// <summary>
     /// 词袋对应的所有计算过消息向量的数据
     /// </summary>
     private List<BagOfWordVector> MessageVectorList { get; set; } = new();
 
+    private Regex MatchEnglishAndNumbers { get; set; } = En_Num_Pattern();
+
     #endregion
-    
+
     /// <summary>
     /// 处理消息链
     /// </summary>
@@ -72,38 +81,83 @@ public class NstMessageProcess : HostDatabaseSupport
     /// <returns></returns>
     public (bool isSendBack, MessageChain messageChain) ProcessMessage(MessageChain messageChain)
     {
+        if (messageChain.FriendUin == Host.MeowBot.BotUin)
+        {
+            return (false, messageChain);
+        }
+        
         var textMessage = ParseTextMessage(messageChain);
-        var filterResult = new JiebaSegmenter().Cut(textMessage)
-            .Where(x => !StopWord.Contains(x))
-            .Where(x => ForbiddenWordsManager.CheckForbiddenWordsManager(x))
-            .ToList();
+        if (textMessage.IsNullOrEmpty())
+        {
+            return (false, messageChain);
+        }
 
-        // 计算完消息向量
+        var filterResult = WordCutter.Cut(textMessage)
+            .Where(x => !StopWord.Contains(x))
+            .Where(x => !ForbiddenWordsManager.CheckForbiddenWordsManager(x))
+            .ToList();
+        
+        // 移除空格 空字符 只有数字或者英文的字符
+        filterResult.RemoveWhere(x => x.IsNullOrEmpty() || string.IsNullOrWhiteSpace(x) || MatchEnglishAndNumbers.IsMatch(x));
+        
+        if (filterResult.Count < 1)
+        {
+            return (false, messageChain);
+        }
+        
+        Host.Info($"分词筛选后结果: {string.Join(",", filterResult)}");
+        // 计算完消息向量, 先保存
         var msgRecord = BagOfWordManager.ProcessCutResult(messageChain, textMessage, filterResult);
-        FindMostSimilarMsg(msgRecord);
+        Insert(msgRecord, NstMessageProcessMsgRecordCollection);
+
+        const double threshold = 0.68d;
+        var waitingList = FindMostSimilarMsg(msgRecord).Where(x => x.similarity > threshold).Take(5).ToList();
+        var count = waitingList.Count;
+        if (count == 0)
+        {
+            return (false, messageChain);
+        }
+
+        var index = new Random().Next(0, count - 1);
+        var (similarity, msgId) = waitingList[index];
+        var firstOrDefault = Query<MsgRecord>(NstMessageProcessMsgRecordCollection).Where(x => x.DbId == msgId)
+            .FirstOrDefault();
+        if (firstOrDefault is null)
+        {
+            return (false, messageChain);
+        }
+
+        // TODO测试阶段先不发
+        var textMsg = firstOrDefault.TextMsg;
+        Host.Info($"源消息: {textMessage}, 相似消息: {textMsg}, 相似度: {similarity}");
+        if (messageChain.GroupUin == 749396837)
+        {
+            // TODO 测试用
+            return (true, messageChain.CreateSameTypeTextMessage(textMsg));
+        }
+        return (false, messageChain.CreateSameTypeTextMessage(textMsg));
     }
 
     /// <summary>
     /// 从所有已经计算过向量的消息中寻找最相似的几条
     /// </summary>
     /// <param name="msgRecord"></param>
-    /// <exception cref="NotImplementedException"></exception>
-    private List<string> FindMostSimilarMsg(MsgRecord msgRecord)
+    private List<(double similarity, int msgId)> FindMostSimilarMsg(MsgRecord msgRecord)
     {
+        //TODO 之后改成定时加载
+        LoadAllMessageVector();
+        MessageVectorList.RemoveWhere(x => x.MsgId == msgRecord.DbId);
         
-        
-        foreach (var (bowId, value) in msgRecord.WordVector)
+        var totalResult = new List<(double similarity, int msgId)>();
+        foreach (var (bowId, vector) in msgRecord.WordVector)
         {
-            if (value is null)
-            {
-                continue;
-            }
-
-            foreach (var (_, _, vector) in MessageVectorList.Where(x => x.BagOfWordId == bowId))
-            {
-                
-            }
+            var wordVectorCalculate = new WordVectorCalculate();
+            var bagOfWordVectorList = MessageVectorList.Where(x => x.BagOfWordId == bowId).ToList();
+            var similarString = wordVectorCalculate.GetSimilarString(bagOfWordVectorList, vector);
+            totalResult.AddRange(similarString);
         }
+
+        return totalResult;
     }
 
     /// <summary>
@@ -111,7 +165,11 @@ public class NstMessageProcess : HostDatabaseSupport
     /// </summary>
     private void LoadAllMessageVector()
     {
-        foreach (var msgRecord in Query<MsgRecord>(NstMessageProcessMsgRecordCollection).Where(x => x.HaveAnyVector).ToList())
+        MessageVectorList.Clear();
+        foreach (var msgRecord in Query<MsgRecord>(NstMessageProcessMsgRecordCollection)
+                     .Where(x => x.HaveAnyVector)
+                     .Where(x => !x.HasDelete)
+                     .ToList())
         {
             foreach (var (bowId, value) in msgRecord.WordVector)
             {
@@ -120,6 +178,7 @@ public class NstMessageProcess : HostDatabaseSupport
                 {
                     continue;
                 }
+
                 MessageVectorList.Add(new BagOfWordVector(bowId, msgRecord.DbId, value));
             }
         }
@@ -132,7 +191,13 @@ public class NstMessageProcess : HostDatabaseSupport
     /// <returns></returns>
     private string ParseTextMessage(MessageChain messageChain)
     {
-        return string.Join(" ", messageChain.Where(x => x is TextEntity)).Trim();
+        return string.Join(" ",
+                messageChain.Where(x => x is TextEntity)
+                    .Select(x => x.ToPreviewText()))
+            .Trim()
+            .Replace(Environment.NewLine, "")
+            .Replace("\r", "")
+            .Replace("\n", "");
     }
 
     /// <summary>
@@ -176,4 +241,7 @@ public class NstMessageProcess : HostDatabaseSupport
         // 记录加载完成的信息，包含加载的停用词数量
         Host.Info($"停用词加载完毕, 一共加载了：{StopWord.Count}个停用词");
     }
+
+    [GeneratedRegex(@"^[a-zA-Z0-9]+$")]
+    private static partial Regex En_Num_Pattern();
 }

@@ -1,17 +1,15 @@
-using System.Reflection.Metadata;
-using BloomFilter;
 using Meow.Core.Model.Base;
 using Meow.Plugin.NeverStopTalkingPlugin.Models;
 
-namespace Meow.Plugin.NeverStopTalkingPlugin;
+namespace Meow.Plugin.NeverStopTalkingPlugin.Service;
 
 /// <summary>
 /// 违禁词管理
 /// </summary>
-public class NstForbiddenWordsManager : HostDatabaseSupport
+public class ForbiddenWordsManager : HostDatabaseSupport
 {
     /// <inheritdoc />
-    public NstForbiddenWordsManager(Core.Meow host) : base(host)
+    public ForbiddenWordsManager(Meow.Core.Meow host) : base(host)
     {
         const int expectedElements = 5000;
         // ForbiddenWordsFilter = FilterBuilder.Build(expectedElements, 0.01);

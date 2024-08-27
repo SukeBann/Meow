@@ -1,4 +1,5 @@
 ﻿using LiteDB;
+using Meow.Core.Model.Base;
 using Serilog;
 
 namespace Meow.Utils;
@@ -39,6 +40,12 @@ public class MeowDatabase
     /// <returns>返回插入对象的BsonValue。</returns>
     public BsonValue Insert<T>(T target, string collectionName)
     {
+        if (target is DatabaseRecordBase record)
+        {
+            record.SetCreateTime();
+            record.RefreshUpdateTime();
+        }
+
         return Repository.Insert<T>(target, collectionName);
     }
 
@@ -51,7 +58,17 @@ public class MeowDatabase
     /// <returns>返回插入对象的数量。</returns>
     public int Insert<T>(IEnumerable<T> targetList, string collectionName)
     {
-        return Repository.Insert<T>(targetList, collectionName);
+        var enumerable = targetList.ToList();
+        foreach (var target in enumerable)
+        {
+            if (target is DatabaseRecordBase record)
+            {
+                record.SetCreateTime();
+                record.RefreshUpdateTime();
+            }
+        }
+
+        return Repository.Insert<T>(enumerable, collectionName);
     }
 
     /// <summary>
@@ -63,6 +80,11 @@ public class MeowDatabase
     /// <returns>如果操作成功返回true。</returns>
     public bool Update<T>(T target, string collectionName)
     {
+        if (target is DatabaseRecordBase record)
+        {
+            record.RefreshUpdateTime();
+        }
+
         return Repository.Update(target, collectionName);
     }
 
@@ -70,12 +92,26 @@ public class MeowDatabase
     /// 更新数据库集合中的一系列对象，返回更新对象的数量。
     /// </summary>
     /// <typeparam name="T">需要更新的对象类型。</typeparam>
-    /// <param name="target">需要更新的对象集合。</param>
     /// <param name="collectionName">目标数据库集合的名称。</param>
     /// <returns>返回更新对象的数量。</returns>
-    public int Update<T>(IEnumerable<T> target, string collectionName)
+    public int Update<T>(IEnumerable<T> targetList, string collectionName)
     {
-        return Repository.Update(target, collectionName);
+        var enumerable = targetList.ToList();
+        var updateCount = 0;
+        foreach (var target in enumerable)
+        {
+            if (target is DatabaseRecordBase record)
+            { 
+                record.RefreshUpdateTime();
+            }
+
+            if (Repository.Update(target, collectionName))
+            {
+                updateCount++;
+            }
+        }
+
+        return updateCount;
     }
 
     /// <summary>

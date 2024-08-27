@@ -1,19 +1,19 @@
-﻿using System.ComponentModel;
-using Lagrange.Core.Message;
+﻿using Lagrange.Core.Message;
 using Meow.Core;
 using Meow.Core.Model.Base;
 using Meow.Plugin.NeverStopTalkingPlugin.Models;
+using Meow.Plugin.NeverStopTalkingPlugin.Service;
 using Meow.Utils;
 
-namespace Meow.Plugin.NeverStopTalkingPlugin;
+namespace Meow.Plugin.NeverStopTalkingPlugin.Command;
 
 /// <summary>
 /// 词袋管理
 /// </summary>
-public class NstBagOfWordCommand : HostDatabaseSupport, IMeowCommand
+public class BagOfWordCommand : HostDatabaseSupport, IMeowCommand
 {
     /// <inheritdoc />
-    public NstBagOfWordCommand(Core.Meow host, NstBagOfWordManager bagOfWordManager) : base(host)
+    public BagOfWordCommand(Core.Meow host, BagOfWordManager bagOfWordManager) : base(host)
     {
         BagOfWordManager = bagOfWordManager;
     }
@@ -21,7 +21,7 @@ public class NstBagOfWordCommand : HostDatabaseSupport, IMeowCommand
     /// <summary>
     /// 词袋管理器
     /// </summary>
-    private NstBagOfWordManager BagOfWordManager { get; set; }
+    private BagOfWordManager BagOfWordManager { get; set; }
 
     /// <inheritdoc />
     public string CommandUid => "8B3F95A4-F7BC-4A4B-B38B-C9153899B496";

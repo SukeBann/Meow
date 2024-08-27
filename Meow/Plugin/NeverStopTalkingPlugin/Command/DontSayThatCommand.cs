@@ -1,16 +1,16 @@
 ﻿using Lagrange.Core.Message;
-using Masuit.Tools;
 using Meow.Core;
+using Meow.Plugin.NeverStopTalkingPlugin.Service;
 using Meow.Utils;
 
-namespace Meow.Plugin.NeverStopTalkingPlugin;
+namespace Meow.Plugin.NeverStopTalkingPlugin.Command;
 
 /// <summary>
 /// 为插件<see cref="NeverStopTalkingPlugin"/>添加 违禁词管理功能
 /// </summary>
-public class NstDontSayThatCommand(NstForbiddenWordsManager forbiddenWordsManager) : IMeowCommand
+public class NstDontSayThatCommand(ForbiddenWordsManager forbiddenWordsManager) : IMeowCommand
 {
-    private NstForbiddenWordsManager ForbiddenWordsManager { get; } = forbiddenWordsManager;
+    private ForbiddenWordsManager ForbiddenWordsManager { get; } = forbiddenWordsManager;
 
     /// <inheritdoc />
     public string CommandUid => "371EE19D-009A-43F9-A712-4DDF8AD71248";

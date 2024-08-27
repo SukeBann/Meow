@@ -10,7 +10,7 @@ namespace Meow.Plugin.NeverStopTalkingPlugin.Models;
 /// </summary>
 public class MsgRecord: DatabaseRecordBase
 {
-    public MsgRecord(MessageChain rawData, string textMsg, List<string> cutResult, uint sender, uint groupId = 0)
+    public MsgRecord(object rawData, string textMsg, List<string> cutResult, uint sender, uint groupId = 0)
     {
         RawData = rawData;
         TextMsg = textMsg;
@@ -28,9 +28,9 @@ public class MsgRecord: DatabaseRecordBase
     public string TextMsg { get; set; }
 
     /// <summary>
-    /// 源数据
+    /// 源数据 类型实际上是<see cref="MessageChain"/> LiteDb找不到构造函数, 暂时用object代替
     /// </summary>
-    public MessageChain RawData { get; set; }
+    public object RawData { get; set; }
     
     /// <summary>
     /// 发送者
@@ -60,5 +60,5 @@ public class MsgRecord: DatabaseRecordBase
     /// <summary>
     /// 词袋DB Id 对应的词袋
     /// </summary>
-    public ConcurrentDictionary<int, List<byte>?> WordVector { get; private set; } = new();
+    public ConcurrentDictionary<int, double[]> WordVector { get; private set; } = new();
 }

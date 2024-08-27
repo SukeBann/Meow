@@ -67,7 +67,7 @@ public abstract class HostDatabaseSupport
     /// <param name="target">需要更新的对象集合。</param>
     /// <param name="collectionName">目标数据库集合的名称。</param>
     /// <returns>更新对象的数量。</returns>
-    protected virtual int Update<T>(IEnumerable<T> target, string collectionName)
+    protected virtual int UpdateCollection<T>(IEnumerable<T> target, string collectionName)
     {
         return Database.Update(target, collectionName);
     }

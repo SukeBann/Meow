@@ -20,6 +20,7 @@ public class BagOfWordRecord : DatabaseRecordBase
         MaxCount = maxCount;
         BagOfWordType = bagOfWordType;
         Uin = uin;
+        CreateTime = DateTime.Now;
     }
 
     /// <summary>
@@ -27,23 +28,24 @@ public class BagOfWordRecord : DatabaseRecordBase
     /// <br/> key: 词
     /// <br/> value: 索引
     /// </summary>
-    public ConcurrentDictionary<string, int> BagOfWord { get; } = new();
-
+    public ConcurrentDictionary<string, int> BagOfWord { get; set; } = new();
+    
     /// <summary>
-    /// 用于记录当前词袋添加到了哪个索引位置,方便更新字典中的索引 而不用便利字典
+    /// 当前添加到哪个索引
     /// </summary>
-    public List<string> BagOfWordList { get; set; } = new();
+    public int CurrentIndex { get; set; } = 0;
 
     /// <summary>
     /// 尝试添加词到词袋中
     /// </summary>
     /// <param name="words"></param>
-    public void TryAddBagOfWord(List<string> words)
+    public int TryAddBagOfWord(List<string> words)
     {
+        var addCount = 0;
         // 先判断一遍词袋是否满了, 如果满了则直接return
         if (IsFull)
         {
-            return;
+            return addCount;
         }
         
         foreach (var word in words)
@@ -51,25 +53,30 @@ public class BagOfWordRecord : DatabaseRecordBase
             // 被装满了就直接return, 这个字典是可能会被并发访问的 所以这个判断是必须的
             if (IsFull)
             {
-                return;
+                return addCount;
             }
+            
             // 尝试重复添加
             while (!BagOfWord.ContainsKey(word))
             {
                 if (IsFull)
                 {
-                    return;
+                    return addCount;
                 }
-                BagOfWordList.Add(word);
-                BagOfWord.TryAdd(word, BagOfWordList.Count - 1);
+                BagOfWord.TryAdd(word, 0);
             }
+
+            addCount++;
+            BagOfWord[word] = CurrentIndex++;
         }
+
+        return addCount;
     }
 
     /// <summary>
     /// 词袋容量
     /// </summary>
-    public int MaxCount { get; }
+    public int MaxCount { get; set; }
 
     /// <summary>
     /// 是否已经装满

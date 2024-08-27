@@ -9,10 +9,11 @@
     <ItemGroup>
         <PackageReference Include="Autofac" Version="8.0.0" />
         <PackageReference Include="BloomFilter.NetCore" Version="2.2.1" />
-        <PackageReference Include="Jieba.NETCore" Version="1.0.8" />
+        <PackageReference Include="jieba.NET" Version="0.42.2" />
         <PackageReference Include="Lagrange.Core" Version="0.3.0"/>
         <PackageReference Include="LiteDB" Version="5.0.21" />
         <PackageReference Include="Masuit.Tools.Core" Version="2024.4.5"/>
+        <PackageReference Include="MathNet.Numerics" Version="5.0.0" />
         <PackageReference Include="QRCoder-ImageSharp" Version="0.10.0" />
         <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
         <PackageReference Include="Serilog.Sinks.Debug" Version="3.0.0" />
