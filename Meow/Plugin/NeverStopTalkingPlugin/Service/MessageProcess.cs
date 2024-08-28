@@ -80,6 +80,13 @@ public partial class MessageProcess : HostDatabaseSupport
     /// 匹配表情
     /// </summary>
     private readonly Regex EmojiPattern = GEmojiPattern();
+    
+    [GeneratedRegex(@"^[a-zA-Z0-9]+$")]
+    private static partial Regex En_Num_Pattern();
+    
+    // ReSharper disable once StringLiteralTypo
+    [GeneratedRegex(@"[\uD800-\uDBFF][\uDC00-\uDFFF]|[\u2600-\u26FF]|[\u2700-\u27BF]|[\uE000-\uF8FF]|[\u2100-\u214F]|[\u203C\u2049]", RegexOptions.Compiled)]
+    private static partial Regex GEmojiPattern();
 
     #endregion
 
@@ -90,6 +97,7 @@ public partial class MessageProcess : HostDatabaseSupport
     /// <returns></returns>
     public (bool isSendBack, MessageChain messageChain) ProcessMessage(MessageChain messageChain)
     {
+        // 不处理自身消息
         if (messageChain.FriendUin == Host.MeowBot.BotUin)
         {
             return (false, messageChain);
@@ -210,6 +218,7 @@ public partial class MessageProcess : HostDatabaseSupport
             .Replace("\r", "")
             .Replace("\n", "");
 
+        // 不去掉这些表情 消息存储进LiteDb会报错
         return EmojiPattern.Replace(rawData, string.Empty);
     }
 
@@ -254,9 +263,4 @@ public partial class MessageProcess : HostDatabaseSupport
         // 记录加载完成的信息，包含加载的停用词数量
         Host.Info($"停用词加载完毕, 一共加载了：{StopWord.Count}个停用词");
     }
-
-    [GeneratedRegex(@"^[a-zA-Z0-9]+$")]
-    private static partial Regex En_Num_Pattern();
-    [GeneratedRegex(@"[\uD800-\uDBFF][\uDC00-\uDFFF]|[\u2600-\u26FF]|[\u2700-\u27BF]|[\uE000-\uF8FF]|[\u2100-\u214F]|[\u203C\u2049]", RegexOptions.Compiled)]
-    private static partial Regex GEmojiPattern();
 }
