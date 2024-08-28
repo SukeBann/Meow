@@ -2,7 +2,10 @@
 using Lagrange.Core;
 using Lagrange.Core.Common;
 using Lagrange.Core.Common.Interface;
+using LiteDB;
+using Meow.Config;
 using Meow.Utils;
+using Newtonsoft.Json;
 using Serilog;
 
 namespace Meow.Bootstrapper;
@@ -39,12 +42,12 @@ public class MeowBootstrapper
     #endregion
 
     #region Init
-    
+
     /// <summary>
     /// 是否以及初始化
     /// </summary>
     private static bool IsInit { get; set; }
-    
+
     /// <summary>
     /// 初始化
     /// </summary>
@@ -55,6 +58,7 @@ public class MeowBootstrapper
         {
             throw new InvalidOperationException($"请不要重复初始化{nameof(MeowBootstrapper)}");
         }
+
         ConfigurationServices();
         var meowBootstrapper = new MeowBootstrapper(Ioc.GetService<ILogger>());
         IsInit = true;
@@ -93,20 +97,44 @@ public class MeowBootstrapper
     /// <param name="commandArgsSeparator">参数分隔符</param>
     /// <returns></returns>
     /// <exception cref="IOException">如果目录不存在则会抛出此异常</exception>
-    public MeowBootstrapper ConfigurationBot(string workDIr, string meowName, char commandPrompt,
-        char commandArgsSeparator)
+    public MeowBootstrapper ConfigurationBot()
     {
-        WorkDir = Path.Combine(workDIr, meowName);
-
+        var config = GetConfig();
+        WorkDir = Path.Combine(config.BotWorkDir, config.BotName);
         if (!Directory.Exists(WorkDir))
         {
             var messageTemplate = $"无法找到配置文件目录:{WorkDir}";
             throw new IOException(messageTemplate);
         }
 
-        Log.Information("Meow:[{MeowName}]将在此路径中工作: {WorkDir}", meowName, WorkDir);
-        Meow = new Core.Meow(meowName, WorkDir, commandPrompt, commandArgsSeparator);
+        Log.Information("Meow:[{MeowName}]将在此路径中工作: {WorkDir}", config.BotName, WorkDir);
+        Meow = new Core.Meow(config.BotName, WorkDir, config.CommandPrompt, config.CommandArgsSeparator);
         return this;
+    }
+
+    /// <summary>
+    /// 从程序所在目录读取Config.json并反序列化为MeowConfig
+    /// </summary>
+    /// <returns></returns>
+    /// <exception cref="FileNotFoundException">当Config.json文件未找到时抛出此异常</exception>
+    /// <exception cref="JsonException">当反序列化Config.json文件失败时抛出此异常</exception>
+    private MeowConfig GetConfig()
+    {
+        var configPath = Path.Combine(StaticValue.AppCurrentPath, "Config.json");
+        if (!File.Exists(configPath))
+        {
+            throw new FileNotFoundException($"配置文件未找到: {configPath}");
+        }
+        try
+        {
+            var jsonContent = File.ReadAllText(configPath);
+            var config = JsonConvert.DeserializeObject<MeowConfig>(jsonContent) ?? throw new JsonException("配置文件反序列化失败");
+            return config;
+        }
+        catch (Exception ex) when (ex is IOException or JsonException)
+        {
+            throw new Exception($"读取配置文件时发生错误: {ex.Message}", ex);
+        }
     }
 
     /// <summary>
@@ -124,7 +152,7 @@ public class MeowBootstrapper
         {
             throw new Exception("你应该先设置工作目录");
         }
-        
+
         if (keystore is not null)
         {
             BotInfoManager.SaveKeystore(WorkDir, keystore);
@@ -154,7 +182,7 @@ public class MeowBootstrapper
         {
             throw new Exception("构建Meow时发生错误, 请检查构造流程");
         }
-        
+
         Meow.MeowBot = Bot;
         return Meow;
     }

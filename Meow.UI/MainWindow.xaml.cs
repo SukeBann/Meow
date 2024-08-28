@@ -32,13 +32,12 @@ public partial class MainWindow
 
     private async void OnLoaded(object sender, RoutedEventArgs args)
     {
-        const uint admin = 1052700448;
         LoggerCreator.EditLoggerConfigurationInterface += configuration => RichBoxLogConfig.GetLogRichBoxPanel(
             configuration,
             RichTextBox);
 
         var littleTang = MeowBootstrapper.Init()
-            .ConfigurationBot(@"D:\BotWorkDir", "LittleTang", '/', ' ')
+            .ConfigurationBot()
             .SetBotInfo(new BotConfig())
             .BuildMeow();
 
@@ -52,8 +51,6 @@ public partial class MainWindow
             var randStr = Console.ReadLine();
             if (captcha != null && randStr != null) littleTang.MeowBot.SubmitCaptcha(captcha, randStr);
         });
-
-        littleTang.EditUserPermission(admin, UserPermission.Admin);
 
         var helpPlugin = new HelpPlugin();
         littleTang.LoadPlugin(helpPlugin);

@@ -14,12 +14,10 @@ internal class Program
 {
     public static async Task Main(string[] args)
     {
-        const uint admin = 1052700448;
-
         try
         {
             var littleTang = MeowBootstrapper.Init()
-                .ConfigurationBot(@"D:\BotWorkDir", "LittleTang", '/', ' ')
+                .ConfigurationBot()
                 .SetBotInfo(new BotConfig())
                 .BuildMeow();
 

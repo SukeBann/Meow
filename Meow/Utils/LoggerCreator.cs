@@ -27,12 +27,12 @@ public static class LoggerCreator
             .WriteTo.File(logFilePath,
                 rollingInterval: RollingInterval.Hour,
                 rollOnFileSizeLimit: true,
-                fileSizeLimitBytes: 2 * 1024 * 1024, 
+                fileSizeLimitBytes: 2 * 1024 * 1024,
                 retainedFileCountLimit: 10)
+            .WriteTo.Console()
             .MinimumLevel.Information();
 #if DEBUG
         loggerConfiguration.MinimumLevel.Debug()
-            .WriteTo.Console()
             .WriteTo.Debug();
 #endif
         if (EditLoggerConfigurationInterface is not null)
