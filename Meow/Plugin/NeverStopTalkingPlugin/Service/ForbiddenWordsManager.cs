@@ -20,7 +20,7 @@ public class ForbiddenWordsManager : HostDatabaseSupport
     #region Properties
 
     /// <summary>
-    /// 违禁词布隆过滤器
+    /// 违禁词过滤器
     /// </summary>
     private HashSet<string> ForbiddenWordsFilter { get; }
 

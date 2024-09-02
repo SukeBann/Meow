@@ -26,7 +26,7 @@ internal class Program
             littleTang.OnBotCaptchaEvent.Subscribe(@event =>
             {
                 var (_, botCaptchaEvent) = @event;
-                Ioc.GetService<Serilog.ILogger>()?.Information("Bot需要验证码识别: {CaptchaEvent}", botCaptchaEvent.ToString());
+                Ioc.GetService<ILogger>()?.Information("Bot需要验证码识别: {CaptchaEvent}", botCaptchaEvent.ToString());
                 var captcha = System.Console.ReadLine();
                 var randStr = System.Console.ReadLine();
                 if (captcha != null && randStr != null) littleTang.MeowBot.SubmitCaptcha(captcha, randStr);

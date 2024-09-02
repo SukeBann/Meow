@@ -125,5 +125,16 @@ public class MeowDatabase
         return Repository.Query<T>(collectionName);
     }
 
+    /// <summary>
+    /// 获取指定名称的数据库集合。
+    /// </summary>
+    /// <typeparam name="T">集合中的元素类型。</typeparam>
+    /// <param name="collectionName">数据库集合的名称。</param>
+    /// <returns>指定名称的数据库集合。</returns>
+    public ILiteCollection<T> GetCollection<T>(string collectionName)
+    {
+        return Repository.Database.GetCollection<T>(collectionName);
+    }
+
     #endregion
 }

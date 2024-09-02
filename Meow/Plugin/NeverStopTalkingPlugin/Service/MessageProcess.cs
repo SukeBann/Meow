@@ -4,6 +4,7 @@ using Castle.Core.Logging;
 using JiebaNet.Segmenter;
 using Lagrange.Core.Message;
 using Lagrange.Core.Message.Entity;
+using LiteDB;
 using Masuit.Tools;
 using Meow.Core.Model.Base;
 using Meow.Plugin.NeverStopTalkingPlugin.Models;
@@ -34,7 +35,7 @@ public partial class MessageProcess : HostDatabaseSupport
         ForbiddenWordsManager = forbiddenWordsManager;
         BagOfWordManager = bagOfWordManager;
 
-        LoadAllMessageVector();
+        ComputeMessageVector();
         StopWord = [];
         _ = LoadStopWord();
     }
@@ -67,11 +68,6 @@ public partial class MessageProcess : HostDatabaseSupport
     private JiebaSegmenter WordCutter { get; set; } = new();
 
     /// <summary>
-    /// 词袋对应的所有计算过消息向量的数据
-    /// </summary>
-    private List<BagOfWordVector> MessageVectorList { get; set; } = new();
-
-    /// <summary>
     /// 匹配纯英文或数字
     /// </summary>
     private Regex MatchEnglishAndNumbers { get; set; } = En_Num_Pattern();
@@ -80,12 +76,14 @@ public partial class MessageProcess : HostDatabaseSupport
     /// 匹配表情
     /// </summary>
     private readonly Regex EmojiPattern = GEmojiPattern();
-    
+
     [GeneratedRegex(@"^[a-zA-Z0-9]+$")]
     private static partial Regex En_Num_Pattern();
-    
+
     // ReSharper disable once StringLiteralTypo
-    [GeneratedRegex(@"[\uD800-\uDBFF][\uDC00-\uDFFF]|[\u2600-\u26FF]|[\u2700-\u27BF]|[\uE000-\uF8FF]|[\u2100-\u214F]|[\u203C\u2049]", RegexOptions.Compiled)]
+    [GeneratedRegex(
+        @"[\uD800-\uDBFF][\uDC00-\uDFFF]|[\u2600-\u26FF]|[\u2700-\u27BF]|[\uE000-\uF8FF]|[\u2100-\u214F]|[\u203C\u2049]",
+        RegexOptions.Compiled)]
     private static partial Regex GEmojiPattern();
 
     #endregion
@@ -97,45 +95,30 @@ public partial class MessageProcess : HostDatabaseSupport
     /// <returns></returns>
     public (bool isSendBack, MessageChain messageChain) ProcessMessage(MessageChain messageChain)
     {
-        // 不处理自身消息
-        if (messageChain.FriendUin == Host.MeowBot.BotUin)
+        // 不处理自身消息, 获取textMessage为空 filterResult为空的清空下 就退出
+        if (GetTextMsg(messageChain, out var textMessage, out var filterResult))
         {
             return (false, messageChain);
         }
 
-        var textMessage = ParseTextMessage(messageChain);
-        if (textMessage.IsNullOrEmpty())
-        {
-            return (false, messageChain);
-        }
-
-        var filterResult = WordCutter.Cut(textMessage)
-            .Where(x => !StopWord.Contains(x))
-            .Where(x => !ForbiddenWordsManager.CheckForbiddenWordsManager(x))
-            .ToList();
-
-        // 移除空格 空字符 只有数字或者英文的字符
-        filterResult.RemoveWhere(x =>
-            x.IsNullOrEmpty() || string.IsNullOrWhiteSpace(x) || MatchEnglishAndNumbers.IsMatch(x));
-
-        if (filterResult.Count < 1)
-        {
-            return (false, messageChain);
-        }
-
-        Host.Info($"分词筛选后结果: {string.Join(",", filterResult)}");
         // 计算完消息向量, 先保存
         var msgRecord = BagOfWordManager.ProcessCutResult(messageChain, textMessage, filterResult);
-        Insert(msgRecord, NstMessageProcessMsgRecordCollection);
+        Insert(msgRecord.msgRecord, NstMessageProcessMsgRecordCollection);
 
-        const double threshold = 0.68d;
-        var waitingList = FindMostSimilarMsg(msgRecord).Where(x => x.similarity > threshold).Take(5).ToList();
+        const double threshold = 0.5d;
+        var waitingList = FindMostSimilarMsg(msgRecord.bagOfWordVectors)
+            .Where(x => x.similarity > threshold)
+            .Take(5)
+            .ToList();
+
+        // 查找列表为空时退出
         var count = waitingList.Count;
         if (count == 0)
         {
             return (false, messageChain);
         }
 
+        // 多条随机取一条
         var index = new Random().Next(0, count - 1);
         var (similarity, msgId) = waitingList[index];
         var firstOrDefault = Query<MsgRecord>(NstMessageProcessMsgRecordCollection).Where(x => x.DbId == msgId)
@@ -147,7 +130,8 @@ public partial class MessageProcess : HostDatabaseSupport
 
         // TODO测试阶段先不发
         var textMsg = firstOrDefault.TextMsg;
-        Host.Info($"源消息: {textMessage}, 相似消息: {textMsg}, 相似度: {similarity}");
+        var message = $"源消息: {textMessage}\n相似消息: {textMsg}\n相似度: {similarity}";
+        Host.Info(message);
         if (messageChain.GroupUin == 749396837)
         {
             // TODO 测试用
@@ -158,50 +142,80 @@ public partial class MessageProcess : HostDatabaseSupport
     }
 
     /// <summary>
+    /// 获取文本消息并进行处理。
+    /// </summary>
+    /// <param name="messageChain">消息链。</param>
+    /// <param name="textMessage">输出参数，解析后的文本消息。</param>
+    /// <param name="filterResult">输出参数，经过筛选后的结果列表。</param>
+    /// <returns>如果消息不需要进一步处理，返回 true；否则返回 false。</returns>
+    private bool GetTextMsg(MessageChain messageChain, out string textMessage, out List<string> filterResult)
+    {
+        filterResult = null;
+        textMessage = string.Empty;
+
+        // 不处理自身消息
+        if (messageChain.FriendUin == Host.MeowBot.BotUin)
+        {
+            return true;
+        }
+
+        textMessage = ParseTextMessage(messageChain);
+        if (textMessage.IsNullOrEmpty())
+        {
+            return true;
+        }
+
+        filterResult = WordCutter.Cut(textMessage)
+            .Where(x => !StopWord.Contains(x))
+            .Where(x => !ForbiddenWordsManager.CheckForbiddenWordsManager(x))
+            .ToList();
+
+        // 移除空格、空字符、只有数字或者英文的字符
+        filterResult.RemoveWhere(x =>
+            x.IsNullOrEmpty() || string.IsNullOrWhiteSpace(x) || MatchEnglishAndNumbers.IsMatch(x));
+
+        if (filterResult.Count < 1)
+        {
+            return true;
+        }
+
+        Host.Info($"分词筛选后结果: {string.Join(",", filterResult)}");
+        return false;
+    }
+
+    /// <summary>
     /// 从所有已经计算过向量的消息中寻找最相似的几条
     /// </summary>
-    /// <param name="msgRecord"></param>
-    private List<(double similarity, int msgId)> FindMostSimilarMsg(MsgRecord msgRecord)
+    /// <param name="bagOfWordVectors">需要对比哪些向量</param>
+    private List<(double similarity, int msgId)> FindMostSimilarMsg(List<BagOfWordVector> bagOfWordVectors)
     {
-        //TODO 之后改成定时加载
-        LoadAllMessageVector();
-        MessageVectorList.RemoveWhere(x => x.MsgId == msgRecord.DbId);
-
         var totalResult = new List<(double similarity, int msgId)>();
-        foreach (var (bowId, vector) in msgRecord.WordVector)
+        foreach (var bagOfWordVector in bagOfWordVectors)
         {
             var wordVectorCalculate = new WordVectorCalculate();
-            var bagOfWordVectorList = MessageVectorList.Where(x => x.BagOfWordId == bowId).ToList();
-            var similarString = wordVectorCalculate.GetSimilarString(bagOfWordVectorList, vector);
-            totalResult.AddRange(similarString);
+            var result = BagOfWordManager.PaginationQueryCalculation(bagOfWordVector.BagOfWordId,
+                page => wordVectorCalculate.GetSimilarString(page,
+                    bagOfWordVector.Vector));
+            totalResult.AddRange(result);
         }
 
         return totalResult;
     }
 
     /// <summary>
-    /// 获取所有计算过向量的消息
+    /// 计算消息向量
+    /// <br/> 查询未删除的消息记录
+    /// <br/> 对每个消息记录，使用词袋管理器获取消息向量, 并存储进向量集合里面
     /// </summary>
-    private void LoadAllMessageVector()
+    private void ComputeMessageVector()
     {
-        MessageVectorList.Clear();
-        foreach (var msgRecord in Query<MsgRecord>(NstMessageProcessMsgRecordCollection)
-                     .Where(x => x.HaveAnyVector)
-                     .Where(x => !x.HasDelete)
-                     .ToList())
+        foreach (var msgRecord in GetCollection<MsgRecord>(NstMessageProcessMsgRecordCollection)
+                     .Find(x => !x.HasDelete))
         {
-            foreach (var (bowId, value) in msgRecord.WordVector)
-            {
-                // 向量为空直接退出
-                if (value is null)
-                {
-                    continue;
-                }
-
-                MessageVectorList.Add(new BagOfWordVector(bowId, msgRecord.DbId, value));
-            }
+            BagOfWordManager.GetMsgVectors(msgRecord);
         }
     }
+
 
     /// <summary>
     /// 将消息链解析为纯文本

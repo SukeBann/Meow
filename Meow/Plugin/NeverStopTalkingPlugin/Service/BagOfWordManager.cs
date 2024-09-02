@@ -25,6 +25,11 @@ public class BagOfWordManager : HostDatabaseSupport
     private const string NstBagOfWordManagerCollection = $"{nameof(NstBagOfWordManagerCollection)}";
 
     /// <summary>
+    /// 词袋计算出来的词向量
+    /// </summary>
+    private const string NstBagOfWordVectorCollection = $"{nameof(NstBagOfWordVectorCollection)}";
+
+    /// <summary>
     /// 群词袋最大数量
     /// </summary>
     private const int GroupBowMaxCount = 5000;
@@ -166,7 +171,9 @@ public class BagOfWordManager : HostDatabaseSupport
     /// <param name="textMessage">消息链中的纯文本数据</param>
     /// <param name="filterResult">分词后经过过滤的结果</param>
     /// <returns>包含了消息是否经过向量计算, 向量计算数据的处理结果</returns>
-    public MsgRecord ProcessCutResult(MessageChain messageChain, string textMessage, List<string> filterResult)
+    public (MsgRecord msgRecord, List<BagOfWordVector> bagOfWordVectors) ProcessCutResult(MessageChain messageChain,
+        string textMessage,
+        List<string> filterResult)
     {
         uint groupId = 0;
         var senderId = messageChain.FriendUin;
@@ -177,32 +184,36 @@ public class BagOfWordManager : HostDatabaseSupport
 
         var msgRecord = new MsgRecord(messageChain, textMessage, filterResult, senderId, groupId);
         // 尝试填充词袋
-        TryFillBagWordRecord(filterResult, senderId, groupId);
+        TryFillBagWord(filterResult, senderId, groupId);
         // 计算所有对应词袋的词向量
-        return GetAllBagOfWordsVectors(msgRecord);
+        return (msgRecord, GetMsgVectors(msgRecord));
     }
 
     /// <summary>
     /// 尝试计算该消息对应词袋的词向量(如果有对应词袋的话)
     /// </summary>
     /// <param name="msgRecord">消息详情</param>
-    private MsgRecord GetAllBagOfWordsVectors(MsgRecord msgRecord)
+    public List<BagOfWordVector> GetMsgVectors(MsgRecord msgRecord)
     {
+        var bagOfWordVectors = new List<BagOfWordVector>();
         var filterResult = msgRecord.CutResult;
 
         if (BagOfWordRecordList.FirstOrDefault(x => x is {BagOfWordType: BagOfWordType.Global, IsFull: true}) is
             { } global)
         {
-            if (!msgRecord.WordVector.TryGetValue(global.DbId, out var vector) || vector is null)
+            if (msgRecord.IsGroupMsg)
             {
                 // TODO 全局词袋先只收集特定群
-                if (msgRecord.IsGroupMsg)
+                var valid = new uint[] {726070631, 587914615};
+                if (valid.Contains(msgRecord.GroupId))
                 {
-                    var valid = new uint[] {726070631, 587914615};
-                    if (valid.Contains(msgRecord.GroupId))
+                    // 找不到相同的消息被相同词袋计算过向量
+                    if (!GetCollection<BagOfWordVector>(NstBagOfWordVectorCollection)
+                            .Find(x => x.BagOfWordId == 0 && x.msgMd5 == msgRecord.Md5)
+                            .Any())
                     {
                         var calculationResult = CalculateWordVector(filterResult, global);
-                        msgRecord.WordVector[global.DbId] = calculationResult;
+                        bagOfWordVectors.Add(new BagOfWordVector(0, msgRecord.DbId, msgRecord.Md5, calculationResult));
                     }
                 }
             }
@@ -212,10 +223,12 @@ public class BagOfWordManager : HostDatabaseSupport
                 x is {BagOfWordType: BagOfWordType.Group, IsFull: true} && x.Uin == msgRecord.GroupId) is
             { } group)
         {
-            if (!msgRecord.WordVector.TryGetValue(group.DbId, out var vector) || vector is null)
+            if (!GetCollection<BagOfWordVector>(NstBagOfWordVectorCollection)
+                    .Find(x => x.BagOfWordId == group.DbId && x.msgMd5 == msgRecord.Md5)
+                    .Any())
             {
                 var calculationResult = CalculateWordVector(filterResult, group);
-                msgRecord.WordVector[group.DbId] = calculationResult;
+                bagOfWordVectors.Add(new BagOfWordVector(group.Uin, msgRecord.DbId, msgRecord.Md5, calculationResult));
             }
         }
 
@@ -223,14 +236,19 @@ public class BagOfWordManager : HostDatabaseSupport
                 x is {BagOfWordType: BagOfWordType.Personal, IsFull: true} && x.Uin == msgRecord.Sender) is
             { } personal)
         {
-            if (!msgRecord.WordVector.TryGetValue(personal.DbId, out var vector) || vector is null)
+            if (!GetCollection<BagOfWordVector>(NstBagOfWordVectorCollection)
+                    .Find(x => x.BagOfWordId == personal.DbId && x.msgMd5 == msgRecord.Md5)
+                    .Any())
             {
                 var calculationResult = CalculateWordVector(filterResult, personal);
-                msgRecord.WordVector[personal.DbId] = calculationResult;
+                bagOfWordVectors.Add(
+                    new BagOfWordVector(personal.Uin, msgRecord.DbId, msgRecord.Md5, calculationResult));
             }
         }
 
-        return msgRecord;
+        InsertCollection(bagOfWordVectors, NstBagOfWordManagerCollection);
+
+        return bagOfWordVectors;
     }
 
     /// <summary>
@@ -278,7 +296,7 @@ public class BagOfWordManager : HostDatabaseSupport
     /// <param name="filterResult">需要添加到词袋中的词列表。</param>
     /// <param name="groupId">可选的群组ID，如果存在则尝试添加到群词袋</param>
     /// <param name="senderId">发送人Id 如果存在个人词袋则会尝试添加到个人词袋</param>
-    private void TryFillBagWordRecord(List<string> filterResult, uint senderId, uint? groupId)
+    private void TryFillBagWord(List<string> filterResult, uint senderId, uint? groupId)
     {
         var changeList = new List<BagOfWordRecord>();
 
@@ -327,6 +345,29 @@ public class BagOfWordManager : HostDatabaseSupport
                 $"需要更新的词袋：{string.Join(", ", changeList.Select(x => $"[{x.BagOfWordType} {x.Uin} {x.BagOfWord.Count}]"))}");
             UpdateCollection(changeList, NstBagOfWordManagerCollection);
         }
+    }
+
+    public List<(double similarity, int msgId)> PaginationQueryCalculation(uint bagOfWordId, Func<List<BagOfWordVector>, List<(double similarity, int msgId)>> pageData)
+    {
+        var currentPage = 1; // 当前页码
+        const int pageSize = 1000; // 每页的数据量
+        List<BagOfWordVector>? page = null;
+        var result = new List<(double, int)>();
+        do
+        {
+            var skip = (currentPage - 1) * pageSize;
+            page = GetCollection<BagOfWordVector>(NstBagOfWordVectorCollection).Find(x => x.BagOfWordId == bagOfWordId).Skip(skip).ToList();
+            if (page.Count == 0)
+            {
+                continue;
+            }
+
+            var data = pageData(page);
+            result.AddRange(data);
+            currentPage++;
+        } while (page.Count != 0);
+
+        return result;
     }
 
     #endregion

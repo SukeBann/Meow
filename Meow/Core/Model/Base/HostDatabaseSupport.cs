@@ -12,6 +12,7 @@ public abstract class HostDatabaseSupport
     /// 获取此实例操作的MeowDatabase对象。
     /// </summary>
     private MeowDatabase Database { get; }
+
     protected Meow Host { get; }
 
     /// <summary>
@@ -43,7 +44,7 @@ public abstract class HostDatabaseSupport
     /// <param name="targetList">要插入的对象集合。</param>
     /// <param name="collectionName">目标数据库集合的名称。</param>
     /// <returns>插入对象的数量。</returns>
-    public virtual int Insert<T>(IEnumerable<T> targetList, string collectionName)
+    public virtual int InsertCollection<T>(IEnumerable<T> targetList, string collectionName)
     {
         return Database.Insert(targetList, collectionName);
     }
@@ -81,5 +82,17 @@ public abstract class HostDatabaseSupport
     protected virtual ILiteQueryable<T> Query<T>(string collectionName)
     {
         return Database.Query<T>(collectionName);
+    }
+
+
+    /// <summary>
+    /// 获取指定名称的数据库集合。
+    /// </summary>
+    /// <typeparam name="T">集合中的元素类型。</typeparam>
+    /// <param name="collectionName">数据库集合的名称。</param>
+    /// <returns>指定名称的数据库集合。</returns>
+    public ILiteCollection<T> GetCollection<T>(string collectionName)
+    {
+        return Database.GetCollection<T>(collectionName);
     }
 }

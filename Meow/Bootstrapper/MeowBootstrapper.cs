@@ -171,7 +171,7 @@ public class MeowBootstrapper
         Bot = BotFactory.Create(config, botDeviceInfo, loadKeystore);
         return this;
     }
-
+    
     /// <summary>
     /// 构建
     /// </summary>
