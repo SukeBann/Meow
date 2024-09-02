@@ -347,7 +347,20 @@ public class BagOfWordManager : HostDatabaseSupport
         }
     }
 
-    public List<(double similarity, int msgId)> PaginationQueryCalculation(uint bagOfWordId, Func<List<BagOfWordVector>, List<(double similarity, int msgId)>> pageData)
+    /// <summary>
+    /// 根据词袋 ID 对消息向量进行分页查询和相似度计算。
+    /// </summary>
+    /// <param name="bagOfWordId">词袋的数据库 ID。</param>
+    /// <param name="pageData">
+    /// 一个委托方法，用于处理每页的数据，并返回一个包含相似度和消息 ID 的元组列表。
+    /// </param>
+    /// <returns>一个包含相似度和消息 ID 的元组列表。</returns>
+    /// <remarks>
+    /// 该方法分页查询指定词袋 ID 的消息向量，每页返回指定数量的消息向量，并通过委托方法进行相似度计算。
+    /// 委托方法 `pageData` 应该接受一个包含消息向量的列表，并返回一个包含相似度和消息 ID 的元组列表。
+    /// </remarks>
+    public List<(double similarity, int msgId)> PaginationQueryCalculation(uint bagOfWordId,
+        Func<List<BagOfWordVector>, List<(double similarity, int msgId)>> pageData)
     {
         var currentPage = 1; // 当前页码
         const int pageSize = 1000; // 每页的数据量
@@ -356,7 +369,8 @@ public class BagOfWordManager : HostDatabaseSupport
         do
         {
             var skip = (currentPage - 1) * pageSize;
-            page = GetCollection<BagOfWordVector>(NstBagOfWordVectorCollection).Find(x => x.BagOfWordId == bagOfWordId).Skip(skip).ToList();
+            page = GetCollection<BagOfWordVector>(NstBagOfWordVectorCollection).Find(x => x.BagOfWordId == bagOfWordId)
+                .Skip(skip).ToList();
             if (page.Count == 0)
             {
                 continue;
