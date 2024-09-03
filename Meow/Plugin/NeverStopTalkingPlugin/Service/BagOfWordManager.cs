@@ -1,6 +1,11 @@
 ﻿using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
+using System.Diagnostics.Eventing.Reader;
+using System.Security.Cryptography.X509Certificates;
+using AngleSharp.Dom;
 using Lagrange.Core.Message;
 using Masuit.Tools;
+using Masuit.Tools.Security;
 using Meow.Core.Model.Base;
 using Meow.Plugin.NeverStopTalkingPlugin.Models;
 
@@ -14,18 +19,30 @@ public class BagOfWordManager : HostDatabaseSupport
     /// <inheritdoc />
     public BagOfWordManager(Core.Meow host) : base(host)
     {
-        Init();
+        var vectorCollection = GetCollection<BagOfWordVector>(NstBagOfWordVectorCollection);
+        vectorCollection.EnsureIndex(x => x.MsgMd5);
+        vectorCollection.EnsureIndex(x => x.Uin);
+        vectorCollection.EnsureIndex(x => x.BagOfWordType);
+
+        var bowCollection = GetCollection<BagOfWordRecord>(NstBagOfWordManagerCollection);
+        bowCollection.EnsureIndex(x => x.Uin);
+        bowCollection.EnsureIndex(x => x.IsFull);
+        bowCollection.EnsureIndex(x => x.DbId);
+        bowCollection.EnsureIndex(x => x.HasDelete);
+        bowCollection.EnsureIndex(x => x.BagOfWordType);
+
+        GetFillBagOfWordId();
     }
 
     #region Properties
 
     /// <summary>
-    /// 数据库集合
+    /// 词袋集合
     /// </summary>
     private const string NstBagOfWordManagerCollection = $"{nameof(NstBagOfWordManagerCollection)}";
 
     /// <summary>
-    /// 词袋计算出来的词向量
+    /// 词袋计算出来的词向量集合
     /// </summary>
     private const string NstBagOfWordVectorCollection = $"{nameof(NstBagOfWordVectorCollection)}";
 
@@ -40,21 +57,46 @@ public class BagOfWordManager : HostDatabaseSupport
     private const int PersonalBowMaxCount = 5000;
 
     /// <summary>
-    /// 词袋列表
+    /// 已经装满的词袋
+    /// <br/> 词袋id
+    /// <br/> 词袋类型
+    /// <br/> 词袋uin
     /// </summary>
-    private List<BagOfWordRecord> BagOfWordRecordList { get; set; } = [];
+    private HashSet<(BagOfWordType type, uint uin)> FullWordBagInfo { get; } = [];
 
     #endregion
 
     #region Methods
 
     /// <summary>
-    /// 初始化时查询所有词袋到内存中
+    /// 获取已经装满的词袋id
     /// </summary>
-    private void Init()
+    /// <exception cref="NotImplementedException"></exception>
+    private void GetFillBagOfWordId()
     {
-        BagOfWordRecordList = Query<BagOfWordRecord>(NstBagOfWordManagerCollection)
-            .Where(x => !x.HasDelete).ToList();
+        var fullBagOfWordDbId = GetCollection<BagOfWordRecord>(NstBagOfWordManagerCollection)
+            .Find(x => x.IsFull && !x.HasDelete)
+            .Select(x => (x.BagOfWordType, x.Uin)).ToArray();
+
+        FullWordBagInfo.AddRangeIfNotContains(fullBagOfWordDbId);
+    }
+
+    /// <summary>
+    /// 查询并返回指定类型和 UIN(群id或个人id)的词袋记录。
+    /// </summary>
+    /// <param name="wordRecord">输出参数，查询到的词袋记录，如果未找到则为 null。</param>
+    /// <param name="type">词袋类型。</param>
+    /// <param name="uin">群id或个人id。</param>
+    /// <param name="isFull">词袋是否已满的标志，默认为 false。</param>
+    /// <param name="hasDelete">词袋是否已被删除的标志，默认为 false。</param>
+    /// <returns>如果找到符合条件的记录，则返回 true；否则返回 false。</returns>
+    private bool QueryBagOfWordRecord([MaybeNullWhen(false)] out BagOfWordRecord wordRecord, BagOfWordType type,
+        uint uin, bool isFull = false, bool hasDelete = false)
+    {
+        wordRecord = GetCollection<BagOfWordRecord>(NstBagOfWordManagerCollection)
+            .FindOne(x => x.BagOfWordType == type && x.Uin == uin
+                                                  && x.IsFull == isFull && x.HasDelete == hasDelete);
+        return wordRecord is not null;
     }
 
     /// <summary>
@@ -95,7 +137,6 @@ public class BagOfWordManager : HostDatabaseSupport
             bagOfWordType);
 
         Insert(bagOfWordRecord, NstBagOfWordManagerCollection);
-        BagOfWordRecordList.Add(bagOfWordRecord);
         return true;
     }
 
@@ -109,17 +150,12 @@ public class BagOfWordManager : HostDatabaseSupport
     /// <br/> true: 查询成功
     /// <br/> false: 查询失败
     /// </returns>
-    public void QueryBagOfWord(uint uin,
+    public void QueryBagOfWordCommand(uint uin,
         BagOfWordType bagOfWordType,
         out string result)
     {
         result = "查询词袋失败!";
-        var bagOfWordRecord = Query<BagOfWordRecord>(NstBagOfWordManagerCollection)
-            .Where(x => x.BagOfWordType == bagOfWordType)
-            .Where(x => x.Uin == uin)
-            .FirstOrDefault();
-
-        if (bagOfWordRecord is null)
+        if (!QueryBagOfWordRecord(out var bagOfWordRecord, bagOfWordType, uin))
         {
             return;
         }
@@ -160,7 +196,6 @@ public class BagOfWordManager : HostDatabaseSupport
 
         bagOfWordRecord.HasDelete = true;
         Update(bagOfWordRecord, NstBagOfWordManagerCollection);
-        BagOfWordRecordList.RemoveWhere(x => x.DbId == bagOfWordRecord.DbId);
         return true;
     }
 
@@ -171,9 +206,9 @@ public class BagOfWordManager : HostDatabaseSupport
     /// <param name="textMessage">消息链中的纯文本数据</param>
     /// <param name="filterResult">分词后经过过滤的结果</param>
     /// <returns>包含了消息是否经过向量计算, 向量计算数据的处理结果</returns>
-    public (MsgRecord msgRecord, List<BagOfWordVector> bagOfWordVectors) ProcessCutResult(MessageChain messageChain,
+    public MsgRecord ProcessCutResult(MessageChain messageChain,
         string textMessage,
-        List<string> filterResult)
+        string[] filterResult)
     {
         uint groupId = 0;
         var senderId = messageChain.FriendUin;
@@ -182,73 +217,75 @@ public class BagOfWordManager : HostDatabaseSupport
             groupId = messageChain.GroupUin ?? throw new Exception("处理消息失败, 消息链是群消息类型 但却没有包含群id");
         }
 
-        var msgRecord = new MsgRecord(messageChain, textMessage, filterResult, senderId, groupId);
+        var msgRecord = new MsgRecord(textMessage, senderId, groupId);
         // 尝试填充词袋
         TryFillBagWord(filterResult, senderId, groupId);
         // 计算所有对应词袋的词向量
-        return (msgRecord, GetMsgVectors(msgRecord));
+        return msgRecord;
     }
 
     /// <summary>
     /// 尝试计算该消息对应词袋的词向量(如果有对应词袋的话)
     /// </summary>
     /// <param name="msgRecord">消息详情</param>
-    public List<BagOfWordVector> GetMsgVectors(MsgRecord msgRecord)
+    /// <param name="filterResult">分词后的筛选结果</param>
+    public List<BagOfWordVector> GetMsgVectors(MsgRecord msgRecord, string[] filterResult)
     {
         var bagOfWordVectors = new List<BagOfWordVector>();
-        var filterResult = msgRecord.CutResult;
+        var messageMd5 = string.Join(",", filterResult).MDString();
 
-        if (BagOfWordRecordList.FirstOrDefault(x => x is {BagOfWordType: BagOfWordType.Global, IsFull: true}) is
-            { } global)
+        if (msgRecord.DbId < 1)
         {
-            if (msgRecord.IsGroupMsg)
+            return bagOfWordVectors;
+        }
+
+        if (msgRecord.IsGroupMsg)
+        {
+            // 全局词袋只收集这两个群
+            var validGroupIds = new uint[] {726070631, 587914615};
+            if (validGroupIds.Contains(msgRecord.GroupId))
             {
-                // TODO 全局词袋先只收集特定群
-                var valid = new uint[] {726070631, 587914615};
-                if (valid.Contains(msgRecord.GroupId))
-                {
-                    // 找不到相同的消息被相同词袋计算过向量
-                    if (!GetCollection<BagOfWordVector>(NstBagOfWordVectorCollection)
-                            .Find(x => x.BagOfWordId == 0 && x.msgMd5 == msgRecord.Md5)
-                            .Any())
-                    {
-                        var calculationResult = CalculateWordVector(filterResult, global);
-                        bagOfWordVectors.Add(new BagOfWordVector(0, msgRecord.DbId, msgRecord.Md5, calculationResult));
-                    }
-                }
+                AddBagOfWordVector(BagOfWordType.Global, msgRecord.DbId, 0, messageMd5, bagOfWordVectors);
             }
         }
 
-        if (BagOfWordRecordList.FirstOrDefault(x =>
-                x is {BagOfWordType: BagOfWordType.Group, IsFull: true} && x.Uin == msgRecord.GroupId) is
-            { } group)
-        {
-            if (!GetCollection<BagOfWordVector>(NstBagOfWordVectorCollection)
-                    .Find(x => x.BagOfWordId == group.DbId && x.msgMd5 == msgRecord.Md5)
-                    .Any())
-            {
-                var calculationResult = CalculateWordVector(filterResult, group);
-                bagOfWordVectors.Add(new BagOfWordVector(group.Uin, msgRecord.DbId, msgRecord.Md5, calculationResult));
-            }
-        }
+        AddBagOfWordVector(BagOfWordType.Personal, msgRecord.DbId, msgRecord.Sender, messageMd5, bagOfWordVectors);
+        AddBagOfWordVector(BagOfWordType.Group, msgRecord.DbId, msgRecord.GroupId, messageMd5, bagOfWordVectors);
 
-        if (BagOfWordRecordList.FirstOrDefault(x =>
-                x is {BagOfWordType: BagOfWordType.Personal, IsFull: true} && x.Uin == msgRecord.Sender) is
-            { } personal)
+        if (bagOfWordVectors.Count > 0)
         {
-            if (!GetCollection<BagOfWordVector>(NstBagOfWordVectorCollection)
-                    .Find(x => x.BagOfWordId == personal.DbId && x.msgMd5 == msgRecord.Md5)
-                    .Any())
-            {
-                var calculationResult = CalculateWordVector(filterResult, personal);
-                bagOfWordVectors.Add(
-                    new BagOfWordVector(personal.Uin, msgRecord.DbId, msgRecord.Md5, calculationResult));
-            }
+            InsertCollection(bagOfWordVectors, NstBagOfWordVectorCollection);
         }
-
-        InsertCollection(bagOfWordVectors, NstBagOfWordManagerCollection);
 
         return bagOfWordVectors;
+
+        // local method, 用于计算不同词袋的向量
+        void AddBagOfWordVector(BagOfWordType type, int msgId, uint bowUin, string md5, List<BagOfWordVector> result)
+        {
+            // 所需的词袋没有装满就退出
+            if (!FullWordBagInfo.Contains((type, bowUin)))
+            {
+                return;
+            }
+
+            // 被计算过就不在计算
+            if (GetCollection<BagOfWordVector>(NstBagOfWordVectorCollection)
+                .Exists(x => x.BagOfWordType == type && x.Uin == bowUin && x.MsgMd5 == md5))
+            {
+                msgRecord.HaveVector = true;
+                return;
+            }
+
+            if (!QueryBagOfWordRecord(out var bow, type, bowUin, true))
+            {
+                return;
+            }
+
+            var calculatedVector = CalculateWordVector(filterResult, bow);
+            msgRecord.HaveVector = true;
+            result.Add(new BagOfWordVector(bow.DbId, type, bowUin, msgId, md5, calculatedVector.MaxCount,
+                calculatedVector.VectorElementIndex));
+        }
     }
 
     /// <summary>
@@ -256,10 +293,11 @@ public class BagOfWordManager : HostDatabaseSupport
     /// </summary>
     /// <param name="words">需要计算词向量的单词列表</param>
     /// <param name="bagOfWordRecord">词袋记录</param>
-    /// <returns>代表词向量的列表, 目前是byte类型 存储范围0-255</returns>
+    /// <returns>计算结果 MaxCount List[(index, count)]代表向量中有值位置的索引与技术></returns>
     /// <exception cref="ArgumentNullException">当词袋记录或单词列表为空时抛出异常</exception>
     /// <exception cref="InvalidOperationException">当词袋没有填满时抛出异常</exception>
-    private double[] CalculateWordVector(List<string> words, BagOfWordRecord bagOfWordRecord)
+    private (int MaxCount, VectorElementIndex[] VectorElementIndex) CalculateWordVector(string[] words,
+        BagOfWordRecord bagOfWordRecord)
     {
         if (bagOfWordRecord == null)
         {
@@ -276,74 +314,85 @@ public class BagOfWordManager : HostDatabaseSupport
             throw new InvalidOperationException("无法使用没有填满的词袋进行词向量计算");
         }
 
-        var vector = new double[bagOfWordRecord.MaxCount];
-        var wordSet = new HashSet<string>(words); // 使用 HashSet 优化查找速度
-
-        foreach (var (word, index) in bagOfWordRecord.BagOfWord)
+        var indexCount = new Dictionary<int, int>();
+        foreach (var word in words)
         {
-            if (wordSet.Contains(word))
+            if (!bagOfWordRecord.BagOfWord.TryGetValue(word, out var index))
             {
-                vector[index]++;
+                continue;
+            }
+
+            // 如果不存在添加一条计数, 如过存在 计数+1
+            if (!indexCount.TryAdd(index, 1))
+            {
+                indexCount[index]++;
             }
         }
 
-        return vector;
+        return (bagOfWordRecord.MaxCount, indexCount.Select((x, _) => new VectorElementIndex(x.Key, x.Value)).ToArray());
     }
 
     /// <summary>
     /// 尝试将词列表添加到不同类型的词袋中。
     /// </summary>
-    /// <param name="filterResult">需要添加到词袋中的词列表。</param>
-    /// <param name="groupId">可选的群组ID，如果存在则尝试添加到群词袋</param>
+    /// <param name="words">需要添加到词袋中的词列表。</param>
     /// <param name="senderId">发送人Id 如果存在个人词袋则会尝试添加到个人词袋</param>
-    private void TryFillBagWord(List<string> filterResult, uint senderId, uint? groupId)
+    /// <param name="groupId">可选的群组ID，如果存在则尝试添加到群词袋</param>
+    private void TryFillBagWord(string[] words, uint senderId, uint groupId)
     {
+        const uint GlobalGroup1 = 726070631;
+        const uint GlobalGroup2 = 587914615;
+        var validGlobalGroups = new[] {GlobalGroup1, GlobalGroup2};
+
         var changeList = new List<BagOfWordRecord>();
 
-        // 如果全局词袋不为空则往里面添加
-        if (BagOfWordRecordList.FirstOrDefault(x => x.BagOfWordType == BagOfWordType.Global)
-            is {Uin: 0, IsFull: false} global)
+        // 只添加特定群的语料到全局词袋
+        if (validGlobalGroups.Contains(groupId))
         {
-            if (groupId != 0)
-            {
-                var valid = new uint[] {726070631, 587914615};
-                if (valid.Contains(groupId ?? 0))
-                {
-                    if (global.TryAddBagOfWord(filterResult) > 0)
-                    {
-                        changeList.Add(global);
-                    }
-                }
-            }
+            AddWordsToBag(words, BagOfWordType.Global, 0, changeList);
         }
 
-        // 如果存在群词袋则尝试往里面添加
-        if (groupId is not null
-            && BagOfWordRecordList.FirstOrDefault(x => x.BagOfWordType is BagOfWordType.Group && x.Uin == groupId)
-                is { } bagOfWordRecord)
-        {
-            if (bagOfWordRecord.TryAddBagOfWord(filterResult) > 0)
-            {
-                changeList.Add(bagOfWordRecord);
-            }
-        }
-
-        // 如果存在个人袋则尝试往里面添加
-        if (BagOfWordRecordList
-                .FirstOrDefault(x => x.BagOfWordType is BagOfWordType.Personal && x.Uin == senderId)
-            is { } personalRecord)
-        {
-            if (personalRecord.TryAddBagOfWord(filterResult) > 0)
-            {
-                changeList.Add(personalRecord);
-            }
-        }
+        // 添加个人和群词袋
+        AddWordsToBag(words, BagOfWordType.Personal, senderId, changeList);
+        AddWordsToBag(words, BagOfWordType.Group, groupId, changeList);
 
         if (changeList.Count > 0)
         {
             Host.Info(
                 $"需要更新的词袋：{string.Join(", ", changeList.Select(x => $"[{x.BagOfWordType} {x.Uin} {x.BagOfWord.Count}]"))}");
             UpdateCollection(changeList, NstBagOfWordManagerCollection);
+        }
+    }
+
+    /// <summary>
+    /// 将指定的单词数组添加到词袋中。
+    /// </summary>
+    /// <param name="words">要添加的单词数组。</param>
+    /// <param name="bagOfWordType">词袋的类型。</param>
+    /// <param name="uin">词袋对应的唯一标识符。</param>
+    /// <param name="changeList">用于记录已更改的词袋记录的列表。</param>
+    private void AddWordsToBag(string[] words, BagOfWordType bagOfWordType, uint uin, List<BagOfWordRecord> changeList)
+    {
+        // 词袋装满就直接返回
+        if (FullWordBagInfo.Contains((bagOfWordType, uin)))
+        {
+            return;
+        }
+
+        if (!QueryBagOfWordRecord(out var bagOfWordRecord, bagOfWordType, uin))
+        {
+            return;
+        }
+
+        if (bagOfWordRecord.TryAddBagOfWord(words) <= 0)
+        {
+            return;
+        }
+
+        changeList.Add(bagOfWordRecord);
+        if (bagOfWordRecord.IsFull)
+        {
+            FullWordBagInfo.Add((bagOfWordType, uin));
         }
     }
 
@@ -359,7 +408,7 @@ public class BagOfWordManager : HostDatabaseSupport
     /// 该方法分页查询指定词袋 ID 的消息向量，每页返回指定数量的消息向量，并通过委托方法进行相似度计算。
     /// 委托方法 `pageData` 应该接受一个包含消息向量的列表，并返回一个包含相似度和消息 ID 的元组列表。
     /// </remarks>
-    public List<(double similarity, int msgId)> PaginationQueryCalculation(uint bagOfWordId,
+    public List<(double similarity, int msgId)> PaginationQueryCalculation(int bagOfWordId,
         Func<List<BagOfWordVector>, List<(double similarity, int msgId)>> pageData)
     {
         var currentPage = 1; // 当前页码

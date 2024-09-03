@@ -84,7 +84,6 @@ public abstract class HostDatabaseSupport
         return Database.Query<T>(collectionName);
     }
 
-
     /// <summary>
     /// 获取指定名称的数据库集合。
     /// </summary>

@@ -32,8 +32,8 @@ public static class LoggerCreator
             .WriteTo.Console()
             .MinimumLevel.Information();
 #if DEBUG
-        loggerConfiguration.MinimumLevel.Debug()
-            .WriteTo.Debug();
+        // loggerConfiguration.MinimumLevel.Debug()
+            // .WriteTo.Debug();
 #endif
         if (EditLoggerConfigurationInterface is not null)
         {

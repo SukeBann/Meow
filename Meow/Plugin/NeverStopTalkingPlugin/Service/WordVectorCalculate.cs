@@ -12,13 +12,15 @@ public class WordVectorCalculate
     /// <summary>
     /// 用词袋向量集合生成矩阵, 拿vectors在其中做余弦相似度计算
     /// </summary>
-    /// <param name="bagOfWordVectors">词袋向量集合</param>
-    /// <param name="vectors">要匹配的向量</param>
+    /// <param name="totalVector">词袋向量集合</param>
+    /// <param name="target">计算结果</param>
     /// <returns></returns>
     public List<(double similarity, int msgId)> GetSimilarString(
-        List<BagOfWordVector> bagOfWordVectors, double[] vectors)
+        List<BagOfWordVector> totalVector, BagOfWordVector target)
     {
-        var denseMatrix = GetDenseMatrix(bagOfWordVectors, vectors.Length);
+
+        var vectors = UnfoldVector(target);
+        var denseMatrix = GetDenseMatrix(totalVector, vectors.Length);
 
         var newMessageVector = Vector<double>.Build.Dense(vectors);
 
@@ -34,13 +36,35 @@ public class WordVectorCalculate
         var result = new List<(double similarity, int msgId)>();
         foreach (var similarity in similarities.OrderDescending())
         {
-            var msgId = bagOfWordVectors[Array.IndexOf(similarities, similarity)].MsgId;
+            var msgId = totalVector[Array.IndexOf(similarities, similarity)].MsgId;
             result.Add((similarity, msgId));
         }
         return result;
     }
 
-    static double CosineSimilarity(Vector<double> vecA, Vector<double> vecB)
+    /// <summary>
+    /// 将词袋计算结果展开为向量
+    /// </summary>
+    /// <param name="target">词袋计算结果</param>
+    /// <returns></returns>
+    private static double[] UnfoldVector(BagOfWordVector target)
+    {
+        var doubles = new double[target.MaxCount];
+        foreach (var (index, count) in target.VectorElementIndex)
+        {
+            doubles[index] = count;
+        }
+
+        return doubles;
+    }
+
+    /// <summary>
+    /// 对两个长度向量做相似度余弦计算
+    /// </summary>
+    /// <param name="vecA"></param>
+    /// <param name="vecB"></param>
+    /// <returns></returns>
+    private static double CosineSimilarity(Vector<double> vecA, Vector<double> vecB)
     {
         var dotProduct = vecA.DotProduct(vecB);
         var magnitudeA = vecA.L2Norm();
@@ -59,7 +83,7 @@ public class WordVectorCalculate
         var rowCount = bagOfWordVectors.Count;
         var denseMatrixArray = new double[rowCount, columnCount];
 
-        var rowList = bagOfWordVectors.Select(x => x.Vector).ToList();
+        var rowList = bagOfWordVectors.Select(UnfoldVector).ToList();
         for (var rowIndex = 0; rowIndex < rowList.Count; rowIndex++)
         {
             for (var columnIndex = 0; columnIndex < rowList[rowIndex].Length; columnIndex++)

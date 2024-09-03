@@ -130,19 +130,19 @@ public class BagOfWordCommand : HostDatabaseSupport, IMeowCommand
         {
             case BagOfWordType.Group:
             {
-                BagOfWordManager.QueryBagOfWord(target, BagOfWordType.Group, out msg);
+                BagOfWordManager.QueryBagOfWordCommand(target, BagOfWordType.Group, out msg);
                 break;
             }
             case BagOfWordType.Personal:
             {
-                BagOfWordManager.QueryBagOfWord(target,
+                BagOfWordManager.QueryBagOfWordCommand(target,
                     BagOfWordType.Personal,
                     out msg);
                 break;
             }
             case BagOfWordType.Global:
             {
-                BagOfWordManager.QueryBagOfWord(target, BagOfWordType.Global, out msg);
+                BagOfWordManager.QueryBagOfWordCommand(target, BagOfWordType.Global, out msg);
                 break;
             }
             default:

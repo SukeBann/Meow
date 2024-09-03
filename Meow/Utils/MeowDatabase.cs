@@ -46,7 +46,9 @@ public class MeowDatabase
             record.RefreshUpdateTime();
         }
 
-        return Repository.Insert<T>(target, collectionName);
+        var bsonValue = Repository.Insert<T>(target, collectionName);
+        Logger.Debug("Insert Result: {IsSuccess}", bsonValue is not null);
+        return bsonValue;
     }
 
     /// <summary>
@@ -68,7 +70,9 @@ public class MeowDatabase
             }
         }
 
-        return Repository.Insert<T>(enumerable, collectionName);
+        var insert = Repository.Insert<T>(enumerable, collectionName);
+        Logger.Debug("Insert Count: {InsertCount}", insert);
+        return insert;
     }
 
     /// <summary>
@@ -85,7 +89,9 @@ public class MeowDatabase
             record.RefreshUpdateTime();
         }
 
-        return Repository.Update(target, collectionName);
+        var update = Repository.Update(target, collectionName);
+        Logger.Debug("Update result {UpdateResult}", update);
+        return update;
     }
 
     /// <summary>
@@ -110,7 +116,8 @@ public class MeowDatabase
                 updateCount++;
             }
         }
-
+        
+        Logger.Debug("Update Count {UpdateCount}", updateCount);
         return updateCount;
     }
 

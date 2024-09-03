@@ -28,13 +28,13 @@ public class BagOfWordRecord : DatabaseRecordBase
     /// <br/> key: 词
     /// <br/> value: 索引
     /// </summary>
-    public ConcurrentDictionary<string, int> BagOfWord { get; set; } = new();
+    public Dictionary<string, int> BagOfWord { get; set; } = new();
 
     /// <summary>
     /// 尝试添加词到词袋中
     /// </summary>
     /// <param name="words"></param>
-    public int TryAddBagOfWord(List<string> words)
+    public int TryAddBagOfWord(string[] words)
     {
         var addCount = 0;
         // 先判断一遍词袋是否满了, 如果满了则直接return
@@ -45,7 +45,7 @@ public class BagOfWordRecord : DatabaseRecordBase
 
         foreach (var word in words)
         {
-            // 被装满了就直接return, 这个字典是可能会被并发访问的 所以这个判断是必须的
+            // 被装满了就直接return
             if (IsFull)
             {
                 return addCount;

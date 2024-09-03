@@ -1,6 +1,4 @@
-﻿using System.Text;
-using System.Text.RegularExpressions;
-using Castle.Core.Logging;
+﻿using System.Text.RegularExpressions;
 using JiebaNet.Segmenter;
 using Lagrange.Core.Message;
 using Lagrange.Core.Message.Entity;
@@ -9,7 +7,7 @@ using Masuit.Tools;
 using Meow.Core.Model.Base;
 using Meow.Plugin.NeverStopTalkingPlugin.Models;
 using Meow.Utils;
-using Serilog;
+using ZstdSharp.Unsafe;
 
 namespace Meow.Plugin.NeverStopTalkingPlugin.Service;
 
@@ -34,10 +32,15 @@ public partial class MessageProcess : HostDatabaseSupport
     {
         ForbiddenWordsManager = forbiddenWordsManager;
         BagOfWordManager = bagOfWordManager;
-
-        ComputeMessageVector();
         StopWord = [];
         _ = LoadStopWord();
+
+        var msgCollection = GetCollection<MsgRecord>(NstMessageProcessMsgRecordCollection);
+        msgCollection.EnsureIndex(x => x.DbId);
+        msgCollection.EnsureIndex(x => x.HaveVector);
+        msgCollection.EnsureIndex(x => x.HasDelete);
+
+        ComputeMessageVector();
     }
 
     #region Properties
@@ -101,14 +104,15 @@ public partial class MessageProcess : HostDatabaseSupport
             return (false, messageChain);
         }
 
-        // 计算完消息向量, 先保存
         var msgRecord = BagOfWordManager.ProcessCutResult(messageChain, textMessage, filterResult);
-        Insert(msgRecord.msgRecord, NstMessageProcessMsgRecordCollection);
+        // 计算完消息向量, 先保存
+        Insert(msgRecord, NstMessageProcessMsgRecordCollection);
+        var bagOfWordVector = BagOfWordManager.GetMsgVectors(msgRecord, filterResult);
 
         const double threshold = 0.5d;
-        var waitingList = FindMostSimilarMsg(msgRecord.bagOfWordVectors)
-            .Where(x => x.similarity > threshold)
-            .Take(5)
+        var waitingList = FindMostSimilarMsg(bagOfWordVector)
+            .Where(x => x.msgId != msgRecord.DbId && x.similarity > threshold)
+            .Take(10)
             .ToList();
 
         // 查找列表为空时退出
@@ -148,7 +152,7 @@ public partial class MessageProcess : HostDatabaseSupport
     /// <param name="textMessage">输出参数，解析后的文本消息。</param>
     /// <param name="filterResult">输出参数，经过筛选后的结果列表。</param>
     /// <returns>如果消息不需要进一步处理，返回 true；否则返回 false。</returns>
-    private bool GetTextMsg(MessageChain messageChain, out string textMessage, out List<string> filterResult)
+    private bool GetTextMsg(MessageChain messageChain, out string textMessage, out string[] filterResult)
     {
         filterResult = null;
         textMessage = string.Empty;
@@ -159,28 +163,42 @@ public partial class MessageProcess : HostDatabaseSupport
             return true;
         }
 
-        textMessage = ParseTextMessage(messageChain);
+        textMessage = ConvertToPlainText(messageChain);
         if (textMessage.IsNullOrEmpty())
         {
             return true;
         }
 
-        filterResult = WordCutter.Cut(textMessage)
-            .Where(x => !StopWord.Contains(x))
-            .Where(x => !ForbiddenWordsManager.CheckForbiddenWordsManager(x))
-            .ToList();
-
-        // 移除空格、空字符、只有数字或者英文的字符
-        filterResult.RemoveWhere(x =>
-            x.IsNullOrEmpty() || string.IsNullOrWhiteSpace(x) || MatchEnglishAndNumbers.IsMatch(x));
-
-        if (filterResult.Count < 1)
+        // 分词
+        if (CutPlainText(textMessage, out filterResult))
         {
             return true;
         }
 
         Host.Info($"分词筛选后结果: {string.Join(",", filterResult)}");
         return false;
+    }
+
+    /// <summary>
+    /// 分词
+    /// </summary>
+    /// <param name="textMessage"></param>
+    /// <param name="filterResult"></param>
+    /// <returns></returns>
+    private bool CutPlainText(string textMessage, out string[] filterResult)
+    {
+        var cutResult = WordCutter.Cut(textMessage, cutAll:true)
+            .Where(x => !StopWord.Contains(x))
+            .Where(x => !ForbiddenWordsManager.CheckForbiddenWordsManager(x))
+            .ToList();
+
+        // 移除空格、空字符、只有数字或者英文的字符
+        cutResult.RemoveWhere(x =>
+            x.IsNullOrEmpty() || string.IsNullOrWhiteSpace(x) || MatchEnglishAndNumbers.IsMatch(x));
+
+        filterResult = cutResult.ToArray();
+
+        return filterResult.Length < 1;
     }
 
     /// <summary>
@@ -195,11 +213,15 @@ public partial class MessageProcess : HostDatabaseSupport
             var wordVectorCalculate = new WordVectorCalculate();
             var result = BagOfWordManager.PaginationQueryCalculation(bagOfWordVector.BagOfWordId,
                 page => wordVectorCalculate.GetSimilarString(page,
-                    bagOfWordVector.Vector));
+                    bagOfWordVector));
             totalResult.AddRange(result);
         }
 
-        return totalResult;
+        // 去重
+        return totalResult
+            .GroupBy(item => item.msgId)
+            .Select(group => group.OrderByDescending(item => item.similarity).First())
+            .ToList();
     }
 
     /// <summary>
@@ -210,9 +232,21 @@ public partial class MessageProcess : HostDatabaseSupport
     private void ComputeMessageVector()
     {
         foreach (var msgRecord in GetCollection<MsgRecord>(NstMessageProcessMsgRecordCollection)
-                     .Find(x => !x.HasDelete))
+                     .Find(x => !x.HasDelete && !x.HaveVector))
         {
-            BagOfWordManager.GetMsgVectors(msgRecord);
+            if (CutPlainText(msgRecord.TextMsg, out var filterResult))
+            {
+                continue;
+            }
+
+
+            BagOfWordManager.GetMsgVectors(msgRecord, filterResult);
+            // 如果消息被计算了 就update
+            if (msgRecord.HaveVector)
+            {
+                Update(msgRecord, NstMessageProcessMsgRecordCollection);
+                Host.Info("Updated message vector.");
+            }
         }
     }
 
@@ -222,7 +256,7 @@ public partial class MessageProcess : HostDatabaseSupport
     /// </summary>
     /// <param name="messageChain">消息链</param>
     /// <returns></returns>
-    private string ParseTextMessage(MessageChain messageChain)
+    private string ConvertToPlainText(MessageChain messageChain)
     {
         var rawData = string.Join(" ",
                 messageChain.Where(x => x is TextEntity)
