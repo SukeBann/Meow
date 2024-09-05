@@ -39,6 +39,6 @@ public interface IMeowCommand
     /// <param name="meow">在哪个bot上执行</param>
     /// <param name="messageChain">触发命令的消息链</param>
     /// <param name="args">参数</param>
-    public (bool needSendMessage, MessageChain messageChain) RunCommand(Meow meow, MessageChain messageChain,
+    public Task<(bool needSendMessage, MessageChain messageChain)> RunCommand(Meow meow, MessageChain messageChain,
         string? args);
 }

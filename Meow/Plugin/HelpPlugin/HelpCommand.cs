@@ -42,26 +42,26 @@ public class HelpCommand : IMeowCommand
                                         """;
 
     /// <inheritdoc />
-    public (bool needSendMessage, MessageChain messageChain) RunCommand(Core.Meow meow, MessageChain messageChain,
+    public Task<(bool needSendMessage, MessageChain messageChain)> RunCommand(Core.Meow meow, MessageChain messageChain,
         string? args)
     {
         if (args.IsNullOrEmpty())
         {
-            return (true, GetHelpAll(meow, messageChain));
+            return Task.FromResult((true, GetHelpAll(meow, messageChain)));
         }
 
         var isSuccess = new CommandArgsCheckUtil(messageChain, args)
             .IsSuccess(out var message, out var chain, out var argStr, out var argList);
         if (!isSuccess)
         {
-            return (true, messageChain.CreateSameTypeTextMessage(message));
+            return Task.FromResult((true, messageChain.CreateSameTypeTextMessage(message)));
         }
 
         var target = meow.Plugins.SelectMany(x => x.Commands)
             .FirstOrDefault(x => x.CommandTrigger == argStr);
-        return target is null
+        return Task.FromResult(target is null
             ? (true, messageChain.CreateSameTypeTextMessage($"未查询到命令{argStr}"))
-            : (true, messageChain.CreateSameTypeTextMessage(target.CommandHelpDescription));
+            : (true, messageChain.CreateSameTypeTextMessage(target.CommandHelpDescription)));
     }
 
     /// <summary>

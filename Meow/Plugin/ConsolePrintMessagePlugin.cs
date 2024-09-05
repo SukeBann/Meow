@@ -62,10 +62,10 @@ public partial class ConsolePrintMessagePlugin : PluginBase
         var output = messageType switch
         {
             MessageChain.MessageType.Group =>
-                $"G[{groupGroupName}]-[{memberName}]{Environment.NewLine}{messageChain.ToPreviewString()}{Environment.NewLine}",
+                $"{Environment.NewLine}G[{groupGroupName}]-[{memberName}]{Environment.NewLine}{messageChain.ToPreviewText()}",
             MessageChain.MessageType.Temp =>
-                $"T[{groupGroupName}]-[{memberName}|{friendName}]{Environment.NewLine}{messageChain.ToPreviewString()}{Environment.NewLine}",
-            MessageChain.MessageType.Friend => $"F[{friendName}]{Environment.NewLine}{messageChain.ToPreviewString()}{Environment.NewLine}",
+                $"{Environment.NewLine}T[{groupGroupName}]-[{memberName}|{friendName}]{Environment.NewLine}{messageChain.ToPreviewText()}",
+            MessageChain.MessageType.Friend => $"{Environment.NewLine}F[{friendName}]{Environment.NewLine}{messageChain.ToPreviewText()}",
             _ => throw new ArgumentOutOfRangeException(nameof(messageType), "未知的消息类型, 无法正确解析")
         };
         // 如果不替换掉的话 在WPF的RichTextBox输出中会报错

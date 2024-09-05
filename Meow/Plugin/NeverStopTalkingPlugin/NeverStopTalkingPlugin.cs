@@ -62,12 +62,13 @@ public class NeverStopTalkingPlugin : PluginBase
     {
         base.InjectPlugin(host);
         ForbiddenWordsManager = new ForbiddenWordsManager(host);
-        var nstBagOfWordManager = new BagOfWordManager(host);
+        var textCutter = new TextCutter(host, ForbiddenWordsManager);
+        var nstBagOfWordManager = new BagOfWordManager(host, textCutter);
 
         Commands.Add(new NstDontSayThatCommand(ForbiddenWordsManager));
         Commands.Add(new BagOfWordCommand(host, nstBagOfWordManager));
         
-        MessageProcess = new MessageProcess(ForbiddenWordsManager, nstBagOfWordManager, host);
+        MessageProcess = new MessageProcess(nstBagOfWordManager, textCutter, host);
         MessageProcessDisposable = Host!.OnMessageReceived.Subscribe(async x =>
         {
             var (isSendBack, messageChain) = MessageProcess.ProcessMessage(x.messageChain);

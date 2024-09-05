@@ -31,7 +31,7 @@ public class EditPermissionCommand : IMeowCommand
     public bool IsNeedAdmin => true;
 
     /// <inheritdoc />
-    public (bool needSendMessage, MessageChain messageChain) RunCommand(Core.Meow meow, MessageChain messageChain,
+    public Task<(bool needSendMessage, MessageChain messageChain)> RunCommand(Core.Meow meow, MessageChain messageChain,
         string? args)
     {
         throw new NotImplementedException();

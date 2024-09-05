@@ -39,7 +39,7 @@ public class NstDontSayThatCommand(ForbiddenWordsManager forbiddenWordsManager) 
                                         """;
 
     /// <inheritdoc />
-    public (bool needSendMessage, MessageChain messageChain) RunCommand(Core.Meow meow, MessageChain messageChain,
+    public Task<(bool needSendMessage, MessageChain messageChain)> RunCommand(Core.Meow meow, MessageChain messageChain,
         string? args)
     {
         var sender = messageChain.FriendUin;
@@ -47,14 +47,14 @@ public class NstDontSayThatCommand(ForbiddenWordsManager forbiddenWordsManager) 
 
         var argsCheck = new CommandArgsCheckUtil(messageChain, args);
         var checkResult = argsCheck
-            .SplitArgsAndCheckLength(' ', 2, "参数数量错误, 请检查参数格式")
+            .SplitArgsAndCheckLength(' ', 2, new Range(2, 2), "参数数量错误, 请检查参数格式")
             .ArgListMatch(0, ["add", "remove"])
             .ArgListLength(1, 4, 1)
             .IsSuccess(out var msg, out var errorMessageChain, out var arg, out var splitResult);
 
         if (!checkResult)
         {
-            return (true, errorMessageChain);
+            return Task.FromResult((true, errorMessageChain));
         }
 
         // TODO 检查上面的参数检查类是否正常工作
@@ -85,6 +85,6 @@ public class NstDontSayThatCommand(ForbiddenWordsManager forbiddenWordsManager) 
         }
 
         emptyMessage.Text($"命令已执行 {(action == "add" ? "添加" : "删除")}违禁词: {forbiddenWord}");
-        return (true, emptyMessage.Build());
+        return Task.FromResult((true, emptyMessage.Build()));
     }
 }

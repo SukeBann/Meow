@@ -24,12 +24,6 @@ public class ForbiddenWordsManager : HostDatabaseSupport
     /// </summary>
     private HashSet<string> ForbiddenWordsFilter { get; }
 
-
-    /// <summary>
-    /// 违禁词数据库集合
-    /// </summary>
-    public const string NstForbiddenWordsManagerCollection = nameof(NstForbiddenWordsManagerCollection);
-
     #endregion
 
     /// <summary>
@@ -38,7 +32,7 @@ public class ForbiddenWordsManager : HostDatabaseSupport
     /// <exception cref="NotImplementedException"></exception>
     private void LoadForbiddenWordFromDb()
     {
-        var forbiddenWordRecords = Query<ForbiddenWordRecord>(NstForbiddenWordsManagerCollection)
+        var forbiddenWordRecords = Query<ForbiddenWordRecord>(CollStr.NstForbiddenWordsManagerCollection)
             .Where(x => !x.HasDelete)
             .Select(x => x.ForbiddenWord).ToList();
         foreach (var forbiddenWordRecord in forbiddenWordRecords)
@@ -66,7 +60,7 @@ public class ForbiddenWordsManager : HostDatabaseSupport
     /// <param name="sender"></param>
     public void AddForbiddenWord(string word, uint sender)
     {
-        var record = Query<ForbiddenWordRecord>(NstForbiddenWordsManagerCollection)
+        var record = Query<ForbiddenWordRecord>(CollStr.NstForbiddenWordsManagerCollection)
             .Where(x => x.ForbiddenWord == word)
             .FirstOrDefault();
 
@@ -79,13 +73,13 @@ public class ForbiddenWordsManager : HostDatabaseSupport
             }
 
             // 否则取消删除
-            Update(record.SetDeleteState(false), NstForbiddenWordsManagerCollection);
+            Update(record.SetDeleteState(false), CollStr.NstForbiddenWordsManagerCollection);
             ForbiddenWordsFilter.Add(record.ForbiddenWord);
         }
         else
         {
             record = new ForbiddenWordRecord(sender, word);
-            Insert(record, NstForbiddenWordsManagerCollection);
+            Insert(record, CollStr.NstForbiddenWordsManagerCollection);
             ForbiddenWordsFilter.Add(record.ForbiddenWord);
         }
     }
@@ -96,7 +90,7 @@ public class ForbiddenWordsManager : HostDatabaseSupport
     /// <param name="word"></param>
     public void RemoveForbiddenWord(string word)
     {
-        var record = Query<ForbiddenWordRecord>(NstForbiddenWordsManagerCollection)
+        var record = Query<ForbiddenWordRecord>(CollStr.NstForbiddenWordsManagerCollection)
             .Where(x => x.ForbiddenWord == word)
             .FirstOrDefault();
 
@@ -111,7 +105,7 @@ public class ForbiddenWordsManager : HostDatabaseSupport
         }
 
         // 有记录并且不是被删除状态 就把记录删除, 否则都直接return
-        Update(record.SetDeleteState(true), NstForbiddenWordsManagerCollection);
+        Update(record.SetDeleteState(true), CollStr.NstForbiddenWordsManagerCollection);
         // 因为布隆过滤器删除元素异常困难, 所以移除掉违禁词之后要重启才会生效, 我认为这是可以接受的
     }
 }

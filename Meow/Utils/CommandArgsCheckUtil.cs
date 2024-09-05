@@ -5,9 +5,9 @@ using Masuit.Tools;
 
 namespace Meow.Utils;
 
-/// <summary>
-/// 参数检查类
-/// </summary>
+        /// <summary>
+        /// 参数检查类
+        /// </summary>
 public class CommandArgsCheckUtil
 {
     public CommandArgsCheckUtil(MessageChain sourceMessage, string? args)
@@ -54,6 +54,11 @@ public class CommandArgsCheckUtil
     /// 参数分割结果
     /// </summary>
     private List<string>? SplitResult { get; set; }
+
+    /// <summary>
+    /// 分割数量范围
+    /// </summary>
+    private Range SpiltRange { get; set; }
 
     #endregion
 
@@ -111,10 +116,12 @@ public class CommandArgsCheckUtil
     /// </summary>
     /// <param name="splitSymbol">分割符号</param>
     /// <param name="spiltCount">分割长度</param>
+    /// <param name="splitRange">分割的长度范围, 用于后续检查</param>
     /// <param name="errorMsg">如果分割错误的提示信息</param>
     /// <returns></returns>
     public CommandArgsCheckUtil SplitArgsAndCheckLength(char splitSymbol,
         int spiltCount,
+        Range splitRange,
         string errorMsg)
     {
         SplitResult = null;
@@ -123,9 +130,21 @@ public class CommandArgsCheckUtil
             return this;
         }
 
+        if (splitRange.Start.Value < 0)
+        {
+            SetCheckFailed("分割数量范围不能小于0开始");
+            return this;
+        }
+
+        if (splitRange.Start.Value > spiltCount || splitRange.End.Value < spiltCount)
+        {
+            SetCheckFailed("分割数量不能超出指定范围");
+            return this;
+        }
+
         NeedSpilt = true;
         SplitResult = Args!.Split(splitSymbol, spiltCount).ToList();
-        if (SplitResult.Count != spiltCount)
+        if (splitRange.Start.Value > SplitResult.Count || splitRange.End.Value < SplitResult.Count)
         {
             SetCheckFailed(errorMsg);
         }
@@ -240,6 +259,64 @@ public class CommandArgsCheckUtil
             return this;
         }
 
+        return this;
+    }
+
+    /// <summary>
+    /// 当指定索引位置的参数为特定值时，使用正则表达式检查目标索引位置的参数。
+    /// </summary>
+    /// <param name="parmaIndex">条件参数的索引位置</param>
+    /// <param name="param">条件参数的特定值</param>
+    /// <param name="targetIndex">目标参数的索引位置</param>
+    /// <param name="pattern">用于验证目标参数的正则表达式</param>
+    /// <param name="errorTip">如果检查失败，要显示的错误提示信息</param>
+    /// <returns>当前的 <see cref="CommandArgsCheckUtil"/> 实例</returns>
+    /// <remarks>当条件参数值为特定值时，检查目标参数是否符合正则表达式。如果检查失败，设置错误提示信息并返回当前实例。</remarks>
+    public CommandArgsCheckUtil RegexWhenParamIs(int parmaIndex, string param, int targetIndex, string pattern,
+        string errorTip)
+    {
+        // 检查是否有之前的检查失败情况，如果有则直接返回
+        if (CheckFailed)
+        {
+            return this;
+        }
+
+        // 检查是否需要进行分割操作，如果不需要则记录错误并返回
+        if (!NeedSpilt)
+        {
+            SetCheckFailed("命令在未分割的情况下检查索引位置参数");
+            return this;
+        }
+
+        // 检查分割结果是否有效，如果无效则返回
+        if (CheckSpiltValid(parmaIndex, nameof(RegexWhenParamIs)))
+        {
+            return this;
+        }
+
+        // 如果分割结果的数量小于目标索引+1，说明目标参数不存在，此时不进行检查，直接返回
+        if (SplitResult!.Count < targetIndex + 1)
+        {
+            return this;
+        }
+
+        // 使用正则表达式创建一个匹配条件的实例
+        var regex = new Regex(pattern);
+
+        // 检查分割后的参数是否符合预期的值，如果不符合则返回
+        if (SplitResult![parmaIndex] != param)
+        {
+            return this;
+        }
+
+        // 检查目标参数是否符合正则表达式的规则，如果符合则返回
+        if (regex.IsMatch(SplitResult[targetIndex]))
+        {
+            return this;
+        }
+
+        // 如果以上所有检查都未通过，则记录错误信息并返回
+        SetCheckFailed(errorTip);
         return this;
     }
 }

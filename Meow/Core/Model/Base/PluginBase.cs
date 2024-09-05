@@ -60,7 +60,7 @@ public abstract class PluginBase : IMeowPlugin
     protected virtual async void CommandParser(
         (Meow meow, MessageChain messageChain, EventBase @event, string command, string? args) commandArgs)
     {
-        var (meow, messageChain, eventBase, command, args) = commandArgs;
+        var (meow, messageChain, _, command, args) = commandArgs;
         var targetCommand = Commands.FirstOrDefault(x => x.CommandTrigger == command);
         if (targetCommand is null || !targetCommand.CommandTrigger.Equals(targetCommand!.CommandTrigger))
         {
@@ -72,7 +72,7 @@ public abstract class PluginBase : IMeowPlugin
             return;
         }
 
-        var commandResult = targetCommand.RunCommand(meow, messageChain, args);
+        var commandResult = await targetCommand.RunCommand(meow, messageChain, args);
         if (commandResult.needSendMessage)
         {
             await meow.SendMessage(commandResult.messageChain);
