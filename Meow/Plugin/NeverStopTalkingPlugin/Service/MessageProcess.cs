@@ -61,7 +61,7 @@ public class MessageProcess : HostDatabaseSupport
     /// <summary>
     /// 触发几率千分数 如果这个值是18 那么触发几率就是 18/1000
     /// </summary>
-    private int TriggerProbabilityPerThousand { get; set; } = 100;
+    private int TriggerProbabilityPerThousand { get; set; } = 188;
 
     /// <summary>
     /// 触发几率随机数获取器
@@ -194,7 +194,7 @@ public class MessageProcess : HostDatabaseSupport
         // 如果没有找到对应的触发记录，则创建一个新的记录并添加到列表中
         if (nstTriggerRecord is null)
         {
-            nstTriggerRecord = new NstTriggerRecord(bagOfWordType, uin, 0, default);
+            nstTriggerRecord = new NstTriggerRecord(bagOfWordType, uin, 0, null);
             TriggerRecords.Add(nstTriggerRecord);
         }
         else
@@ -211,6 +211,12 @@ public class MessageProcess : HostDatabaseSupport
         if (!isForceTrigger && randomNum > TriggerProbabilityPerThousand)
         {
             Host.Info($"return: {randomNum}, {nstTriggerRecord.TriggerFailedCount}");
+            return false;
+        }
+
+        if (nstTriggerRecord.LastTriggered is not null && (nstTriggerRecord.LastTriggered - DateTime.Now) < TimeSpan.FromMinutes(5))
+        {
+            Host.Info("触发间隔限制");
             return false;
         }
 
