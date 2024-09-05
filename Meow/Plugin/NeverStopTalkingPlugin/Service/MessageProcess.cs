@@ -61,7 +61,7 @@ public class MessageProcess : HostDatabaseSupport
     /// <summary>
     /// 触发几率千分数 如果这个值是18 那么触发几率就是 18/1000
     /// </summary>
-    private int TriggerProbabilityPerThousand { get; set; } = 66;
+    private int TriggerProbabilityPerThousand { get; set; } = 100;
 
     /// <summary>
     /// 触发几率随机数获取器
