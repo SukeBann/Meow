@@ -130,8 +130,14 @@ public partial class TextCutter
     {
         var cutResult = WordCutter.Cut(textMessage, cutAll: true)
             .Where(x => !StopWord.Contains(x))
-            .Where(x => !ForbiddenWordsManager.CheckForbiddenWordsManager(x))
             .ToList();
+
+        if (cutResult.Any(x => ForbiddenWordsManager.CheckForbiddenWordsManager(x)))
+        {
+            Host.Info($"识别到违禁词, 不处理该条消息: {textMessage}");
+            filterResult = null;
+            return true;
+        }
 
         // 移除空格、空字符、只有数字或者英文的字符
         cutResult.RemoveWhere(x =>
