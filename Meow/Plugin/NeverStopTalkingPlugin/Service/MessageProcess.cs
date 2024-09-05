@@ -37,7 +37,7 @@ public class MessageProcess : HostDatabaseSupport
         msgCollection.EnsureIndex(x => x.HaveVector);
         msgCollection.EnsureIndex(x => x.HasDelete);
 
-        // ComputeMessageVector();
+        ComputeMessageVector();
     }
 
     #region properties
@@ -52,7 +52,30 @@ public class MessageProcess : HostDatabaseSupport
     /// </summary>
     private BagOfWordManager BagOfWordManager { get; set; }
 
+    /// <summary>
+    /// 分词器
+    /// </summary>
     private TextCutter TextCutter { get; set; }
+    
+    /// <summary>
+    /// 触发几率千分数 如果这个值是8 那么触发几率就是 8/1000
+    /// </summary>
+    private int TriggerProbabilityPerThousand { get; set; } = 8;
+
+    /// <summary>
+    /// 触发几率随机数获取器
+    /// </summary>
+    private readonly Random _triggerRandom = new();
+    
+    /// <summary>
+    /// 是否要强制触发
+    /// </summary>
+    private bool IsForceTrigger { get; set; }
+
+    /// <summary>
+    /// 触发记录，包含与消息分词和触发条件相关的所有记录
+    /// </summary>
+    private List<NstTriggerRecord> TriggerRecords { get; set; } = new();
 
     #endregion
 
@@ -79,6 +102,11 @@ public class MessageProcess : HostDatabaseSupport
         Insert(msgRecord, CollStr.NstMessageProcessMsgRecordCollection);
         var bagOfWordVector = BagOfWordManager.GetMsgVectors(msgRecord, filterResult);
 
+        if (bagOfWordVector.Count < 1)
+        {
+            return (false, messageChain);
+        }
+
         if (!RepeaterTrigger(bagOfWordVector, msgRecord, out var result))
         {
             return (false, messageChain);
@@ -88,26 +116,10 @@ public class MessageProcess : HostDatabaseSupport
         var message = $"\n源消息: {textMessage}\n相似消息: {textMsg}\n相似度: {result.similarity}";
         Host.Info(message);
         // 限制发哪几个群
-        return messageChain.GroupUin is 749396837 or 726070631 or 587914615
+        return messageChain.GroupUin is 749396837 or 726070631 or 587914615 or 942033342
             ? (true, messageChain.CreateSameTypeTextMessage(textMsg))
             : (false, messageChain.CreateSameTypeTextMessage(textMsg));
     }
-
-    
-    /// <summary>
-    /// 触发几率千分数 如果这个值是8 那么触发几率就是 8/1000
-    /// </summary>
-    private int TriggerProbabilityPerThousand { get; set; } = 8;
-
-    /// <summary>
-    /// 触发几率随机数获取器
-    /// </summary>
-    private readonly Random TriggerRandom = new();
-    
-    /// <summary>
-    /// 是否要强制触发
-    /// </summary>
-    private bool IsForceTrigger { get; set; }
     
     /// <summary>
     /// 根据设置的触发几率决定该次是否触发
@@ -122,9 +134,30 @@ public class MessageProcess : HostDatabaseSupport
     {
         result = (0, null);
         
-        var randomNum = TriggerRandom.Next(0, 1000);
-        if (!IsForceTrigger && randomNum <= TriggerProbabilityPerThousand)
+        // 强制触发
+        var isForceTrigger = false;
+        
+        var randomNum = _triggerRandom.Next(0, 1000);
+        var bagOfWordType = msgRecord.IsGroupMsg ? BagOfWordType.Group : BagOfWordType.Personal;
+        var uin = msgRecord.IsGroupMsg ? msgRecord.GroupId : msgRecord.Sender;
+        var nstTriggerRecord = TriggerRecords.FirstOrDefault(x => x.Uin == uin && x.BagOfWordType == bagOfWordType);
+        if (nstTriggerRecord is null)
         {
+            nstTriggerRecord = new NstTriggerRecord(bagOfWordType, uin, 0, default);
+            TriggerRecords.Add(nstTriggerRecord);
+        }
+        else
+        {
+            if (nstTriggerRecord.TriggerFailedCount > 10)
+            {
+                Host.Info($"{nstTriggerRecord.Uin}-{nstTriggerRecord.TriggerFailedCount}: isForceTrigger: true");
+                isForceTrigger = true;
+            }
+        }
+        
+        if (!isForceTrigger && randomNum > TriggerProbabilityPerThousand)
+        {
+            Host.Info($"return: {randomNum}, {nstTriggerRecord.TriggerFailedCount}");
             return false;
         }
 
@@ -134,11 +167,11 @@ public class MessageProcess : HostDatabaseSupport
             .Take(10)
             .ToList();
 
-        // 查找列表为空时退出, 设置下一次为强制触发, 知道成功触发一次位置
+        // 查找列表为空时退出, 设置当前触发对象的触发失败次数+1
         var count = waitingList.Count;
         if (count == 0)
         {
-            IsForceTrigger = true;
+            nstTriggerRecord.TriggerFailedCount++;
             return false;
         }
 
@@ -148,11 +181,13 @@ public class MessageProcess : HostDatabaseSupport
         var firstMsg = GetCollection<MsgRecord>(CollStr.NstMessageProcessMsgRecordCollection).FindOne(x => x.DbId == msgId);
         if (firstMsg is null)
         {
-            IsForceTrigger = true;
+            nstTriggerRecord.TriggerFailedCount++;
             return false;
         }
 
         result = (similarity, firstMsg);
+        nstTriggerRecord.TriggerFailedCount = 0;
+        nstTriggerRecord.LastTriggered = DateTime.Now;
         return true;
     }
 

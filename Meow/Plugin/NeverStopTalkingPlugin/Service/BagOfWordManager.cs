@@ -173,13 +173,13 @@ public class BagOfWordManager : HostDatabaseSupport
         switch (bagOfWordType)
         {
             case BagOfWordType.Group:
-                records = GetBowAllMsgRecords(x => x.IsGroupMsg && x.GroupId == uin, maxCount);
+                records = GetBowAllMsgRecords(x => x.IsGroupMsg && x.GroupId == uin && !x.HaveVector, maxCount);
                 break;
             case BagOfWordType.Personal:
-                records = GetBowAllMsgRecords(x => x.Sender == uin, maxCount);
+                records = GetBowAllMsgRecords(x => x.Sender == uin && !x.HaveVector, maxCount);
                 break;
             case BagOfWordType.Global:
-                records = GetBowAllMsgRecords(x => true, maxCount);
+                records = GetBowAllMsgRecords(x => !x.HaveVector, maxCount);
                 break;
             default:
                 return Task.FromResult("词袋类型错误");
