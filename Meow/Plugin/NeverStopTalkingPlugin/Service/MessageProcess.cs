@@ -214,9 +214,9 @@ public class MessageProcess : HostDatabaseSupport
             return false;
         }
 
-        if (nstTriggerRecord.LastTriggered is not null && (nstTriggerRecord.LastTriggered - DateTime.Now) < TimeSpan.FromMinutes(5))
+        if (nstTriggerRecord.LastTriggered is not null && (nstTriggerRecord.LastTriggered - DateTime.Now) < TimeSpan.FromSeconds(8))
         {
-            Host.Info("触发间隔限制");
+            Host.Info($"触发间隔限制: {nstTriggerRecord.LastTriggered} now: {DateTime.Now}");
             return false;
         }
 
