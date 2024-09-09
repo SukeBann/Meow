@@ -277,6 +277,7 @@ public class MessageProcess : HostDatabaseSupport
     private List<(double similarity, int msgId)> FindMostSimilarMsg(List<BagOfWordVector> bagOfWordVectors)
     {
         var totalResult = new List<(double similarity, int msgId)>();
+        var startTime = DateTime.Now;
         foreach (var bagOfWordVector in bagOfWordVectors)
         {
             var wordVectorCalculate = new WordVectorCalculate();
@@ -285,6 +286,8 @@ public class MessageProcess : HostDatabaseSupport
                     bagOfWordVector));
             totalResult.AddRange(result);
         }
+        var endTime = DateTime.Now;
+        Host.Info($"SimilarMsg Calculation: Start{startTime}, endTime: {endTime}");
 
         // 去重
         return totalResult

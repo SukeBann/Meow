@@ -612,14 +612,14 @@ public class BagOfWordManager : HostDatabaseSupport
         Func<List<BagOfWordVector>, List<(double similarity, int msgId)>> pageData)
     {
         var currentPage = 1; // 当前页码
-        const int pageSize = 1000; // 每页的数据量
+        const int pageSize = 3000; // 每页的数据量
         List<BagOfWordVector>? page = null;
         var result = new List<(double, int)>();
         do
         {
             var skip = (currentPage - 1) * pageSize;
             page = VectorCollection.Find(x => x.BagOfWordId == bagOfWordId)
-                .Skip(skip).ToList();
+                .Skip(skip).Take(pageSize).ToList();
             if (page.Count == 0)
             {
                 continue;

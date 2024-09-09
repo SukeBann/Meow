@@ -43,13 +43,6 @@ public partial class ConsolePrintMessagePlugin : PluginBase
             .Subscribe(Handle);
     }
 
-    /// <inheritdoc />
-    protected override void CommandParser((Core.Meow meow, MessageChain messageChain, EventBase @event, string command, string? args) commandArgs)
-    {
-        var (meow, messageChain, _, _, _) = commandArgs;
-        Handle((meow, messageChain, messageChain.Type));
-    }
-
     private void Handle((Core.Meow meow, MessageChain messageChain, MessageChain.MessageType messageType) @event)
     {
         var (meow, messageChain, messageType) = @event;
