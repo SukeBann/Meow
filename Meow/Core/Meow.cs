@@ -52,6 +52,6 @@ public partial class Meow : MeowBase, IMeowEvent
 
     private async void OnMeowOnline((Meow meow, BotOnlineEvent botOnlineEvent) obj)
     {
-        BotGroups = await MeowBot.FetchGroups();
+        BotGroups = await MeowBot.FetchGroups().ConfigureAwait(false);
     }
 }

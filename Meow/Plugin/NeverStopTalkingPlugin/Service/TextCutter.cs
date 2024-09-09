@@ -104,7 +104,7 @@ public partial class TextCutter
         // 循环读取每一行，直到文件末尾
         while (!streamReader.EndOfStream)
         {
-            var stopWord = await streamReader.ReadLineAsync();
+            var stopWord = await streamReader.ReadLineAsync().ConfigureAwait(false);
 
             // 如果当前行为空，则跳过
             if (stopWord.IsNullOrEmpty())

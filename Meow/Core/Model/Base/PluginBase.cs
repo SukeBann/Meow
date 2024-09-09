@@ -72,10 +72,10 @@ public abstract class PluginBase : IMeowPlugin
             return;
         }
 
-        var commandResult = await targetCommand.RunCommand(meow, messageChain, args);
+        var commandResult = await targetCommand.RunCommand(meow, messageChain, args).ConfigureAwait(false);
         if (commandResult.needSendMessage)
         {
-            await meow.SendMessage(commandResult.messageChain);
+            await meow.SendMessage(commandResult.messageChain).ConfigureAwait(false);
         }
     }
 

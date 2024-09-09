@@ -39,7 +39,7 @@ internal class Program
             littleTang.LoadPlugin(new PermissionPlugin());
             littleTang.LoadPlugin(new NeverStopTalkingPlugin());
 
-            await littleTang.Login();
+            await littleTang.Login().ConfigureAwait(false);
         }
         catch (Exception e)
         {

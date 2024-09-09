@@ -173,13 +173,13 @@ public class BagOfWordManager : HostDatabaseSupport
         switch (bagOfWordType)
         {
             case BagOfWordType.Group:
-                records = GetBowAllMsgRecords(x => x.IsGroupMsg && x.GroupId == uin && !x.HaveVector, maxCount);
+                records = GetBowAllMsgRecords(x => x.IsGroupMsg && x.GroupId == uin && !x.HasDelete, maxCount);
                 break;
             case BagOfWordType.Personal:
-                records = GetBowAllMsgRecords(x => x.Sender == uin && !x.HaveVector, maxCount);
+                records = GetBowAllMsgRecords(x => x.Sender == uin && !x.HasDelete, maxCount);
                 break;
             case BagOfWordType.Global:
-                records = GetBowAllMsgRecords(x => !x.HaveVector, maxCount);
+                records = GetBowAllMsgRecords(x => !x.HasDelete, maxCount);
                 break;
             default:
                 return Task.FromResult("词袋类型错误");
@@ -455,10 +455,12 @@ public class BagOfWordManager : HostDatabaseSupport
             }
 
             // 被计算过就不在计算
-            if (GetCollection<BagOfWordVector>(CollStr.NstBagOfWordVectorCollection)
-                .Exists(x => x.BagOfWordType == type && x.Uin == bowUin && x.MsgMd5 == md5))
+            var exist = GetCollection<BagOfWordVector>(CollStr.NstBagOfWordVectorCollection)
+                .FindOne(x => x.BagOfWordType == type && x.Uin == bowUin && x.MsgMd5 == md5);
+            if (exist is not null)
             {
                 msgRecord.HaveVector = true;
+                result.Add(exist);
                 return;
             }
 

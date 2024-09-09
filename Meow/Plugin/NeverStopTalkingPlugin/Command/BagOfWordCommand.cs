@@ -94,22 +94,22 @@ public class BagOfWordCommand : HostDatabaseSupport, IMeowCommand
             "add" => (true, Add(messageChain, type, target)),
             "remove" => (true, Remove(messageChain, type, target)),
             "query" => (true, Query(messageChain, type, target)),
-            "msg" => (true, await Msg(messageChain, type, target)),
-            "rebuild" => (true, await Rebuild(messageChain, type, target)),
+            "msg" => (true, await Msg(messageChain, type, target).ConfigureAwait(false)),
+            "rebuild" => (true, await Rebuild(messageChain, type, target).ConfigureAwait(false)),
             _ => (true, messageChain.CreateSameTypeTextMessage("参数异常"))
         };
     }
 
     private async Task<MessageChain> Msg(MessageChain messageChain, BagOfWordType type, uint target)
     {
-        var queryMsgCutBagOfWordCount = await BagOfWordManager.QueryMsgCutBagOfWordCount(type, target);
+        var queryMsgCutBagOfWordCount = await BagOfWordManager.QueryMsgCutBagOfWordCount(type, target).ConfigureAwait(false);
         return messageChain.CreateSameTypeTextMessage(queryMsgCutBagOfWordCount);
     }
 
     private async Task<MessageChain> Rebuild(MessageChain messageChain, BagOfWordType result, uint target)
     {
         BagOfWordManager.BoWBusyStateChange.OnNext(true);
-        var rebuildBagOfWord = await BagOfWordManager.RebuildBagOfWord(result, target);
+        var rebuildBagOfWord = await BagOfWordManager.RebuildBagOfWord(result, target).ConfigureAwait(false);
         BagOfWordManager.BoWBusyStateChange.OnNext(false);
         return messageChain.CreateSameTypeTextMessage(rebuildBagOfWord);
     }

@@ -74,7 +74,7 @@ public class NeverStopTalkingPlugin : PluginBase
             var (isSendBack, messageChain) = MessageProcess.ProcessMessage(x.messageChain);
             if (isSendBack)
             {
-                await Host.SendMessage(messageChain);
+                await Host.SendMessage(messageChain).ConfigureAwait(false);
             }
         });
     }

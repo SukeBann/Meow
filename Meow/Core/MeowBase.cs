@@ -48,17 +48,17 @@ public abstract class MeowBase
     {
         if (BotInfoManager.KeystoreIsExist(WorkFolder))
         {
-            await MeowBot.LoginByPassword();
+            await MeowBot.LoginByPassword().ConfigureAwait(false);
             return;
         }
 
-        var fetchQrCode = await MeowBot.FetchQrCode();
+        var fetchQrCode = await MeowBot.FetchQrCode().ConfigureAwait(false);
         if (fetchQrCode != null)
         {
             var path = Path.Combine(WorkFolder, "qr.png");
-            await File.WriteAllBytesAsync(path, fetchQrCode.Value.QrCode);
+            await File.WriteAllBytesAsync(path, fetchQrCode.Value.QrCode).ConfigureAwait(false);
             Info($"GetQrCodeUrl: {fetchQrCode?.Url}, Image:{path}");
-            await MeowBot.LoginByQrCode();
+            await MeowBot.LoginByQrCode().ConfigureAwait(false);
         }
         else
         {
@@ -72,7 +72,7 @@ public abstract class MeowBase
     /// <param name="messageChain">发送消息</param>
     public async Task SendMessage(MessageChain messageChain)
     {
-        await MeowBot.SendMessage(messageChain);
+        await MeowBot.SendMessage(messageChain).ConfigureAwait(false);
     }
 
     #endregion
