@@ -41,6 +41,7 @@ public class MessageProcess : HostDatabaseSupport
 
         ComputeMessageVector();
         StartProcessTask();
+        Host.SendMessage(MessageBuilder.Friend(1052700448).Text("Link Start").Build());
     }
 
     #region properties
@@ -110,8 +111,9 @@ public class MessageProcess : HostDatabaseSupport
             var msgTime = messageChain.Time.Add(TimeSpan.FromHours(8));
             if (DateTime.Now - msgTime > TimeSpan.FromSeconds(15))
             {
-               return; 
+                return;
             }
+
             if (IsBowManagerBusy)
             {
                 return;
@@ -119,6 +121,12 @@ public class MessageProcess : HostDatabaseSupport
 
             // 不处理自身消息, 获取textMessage为空 filterResult为空的清空下 就退出
             if (TextCutter.GetTextMsg(messageChain, out var textMessage, out var filterResult))
+            {
+                return;
+            }
+
+            // 不在处理分词结果小于1的句子
+            if (filterResult.Length < 2)
             {
                 return;
             }
@@ -180,8 +188,7 @@ public class MessageProcess : HostDatabaseSupport
         }
 
         const double threshold = 0.75d;
-        var waitingList = FindMostSimilarMsg(allVector)
-            .Where(x => x.msgId != msgRecord.DbId && x.similarity > threshold)
+        var waitingList = FindMostSimilarMsg(allVector, threshold)
             .Take(10)
             .ToList();
 
@@ -209,7 +216,7 @@ public class MessageProcess : HostDatabaseSupport
         nstTriggerRecord.LastTriggered = DateTime.Now;
         return true;
     }
-
+    
     /// <summary>
     /// 尝试触发操作。
     /// </summary>
@@ -274,7 +281,8 @@ public class MessageProcess : HostDatabaseSupport
     /// 从所有已经计算过向量的消息中寻找最相似的几条
     /// </summary>
     /// <param name="bagOfWordVectors">需要对比哪些向量</param>
-    private List<(double similarity, int msgId)> FindMostSimilarMsg(List<BagOfWordVector> bagOfWordVectors)
+    /// <param name="threshold">最低相似度</param>
+    private List<(double similarity, int msgId)> FindMostSimilarMsg(List<BagOfWordVector> bagOfWordVectors, double threshold)
     {
         var totalResult = new List<(double similarity, int msgId)>();
         var startTime = DateTime.Now;
@@ -283,9 +291,10 @@ public class MessageProcess : HostDatabaseSupport
             var wordVectorCalculate = new WordVectorCalculate();
             var result = BagOfWordManager.PaginationQueryCalculation(bagOfWordVector.BagOfWordId,
                 page => wordVectorCalculate.GetSimilarString(page,
-                    bagOfWordVector));
+                    bagOfWordVector, threshold));
             totalResult.AddRange(result);
         }
+
         var endTime = DateTime.Now;
         Host.Info($"SimilarMsg Calculation: Start{startTime}, endTime: {endTime}");
 
@@ -309,6 +318,11 @@ public class MessageProcess : HostDatabaseSupport
             if (TextCutter.CutPlainText(msgRecord.TextMsg, out var filterResult))
             {
                 continue;
+            }
+
+            if (filterResult.Length < 2)
+            {
+               continue; 
             }
 
             BagOfWordManager.GetMsgVectors(msgRecord, filterResult);

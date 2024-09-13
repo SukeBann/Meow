@@ -1,6 +1,7 @@
 ﻿using MathNet.Numerics.LinearAlgebra;
 using MathNet.Numerics.LinearAlgebra.Double;
 using Meow.Plugin.NeverStopTalkingPlugin.Models;
+using Vector = MathNet.Numerics.LinearAlgebra.Complex32.Vector;
 
 namespace Meow.Plugin.NeverStopTalkingPlugin.Service;
 
@@ -14,32 +15,32 @@ public class WordVectorCalculate
     /// </summary>
     /// <param name="totalVector">词袋向量集合</param>
     /// <param name="target">计算结果</param>
+    /// <param name="threshold"></param>
     /// <returns></returns>
-    public List<(double similarity, int msgId)> GetSimilarString(
-        List<BagOfWordVector> totalVector, BagOfWordVector target)
+    public List<(double similarity, int msgId)> GetSimilarString(List<BagOfWordVector> totalVector,
+        BagOfWordVector target, double threshold)
     {
 
         var vectors = UnfoldVector(target);
-        var denseMatrix = GetDenseMatrix(totalVector, vectors.Length);
+        var denseMatrix = UnfoldVectorList(totalVector);
 
         var newMessageVector = Vector<double>.Build.Dense(vectors);
 
         // 计算余弦相似度
-        var denseMatrixRowCount = denseMatrix.RowCount;
-        var similarities = new double[denseMatrixRowCount];
+        var denseMatrixRowCount = denseMatrix.Length;
+        var similarities = new List<(double similarity, int msgId)>();
         Parallel.For(0, denseMatrixRowCount, i =>
         {
-            var vector = denseMatrix.Row(i);
-            similarities[i] = CosineSimilarity(newMessageVector, vector);
+            var vector = denseMatrix[i].vector;
+            var msgId = denseMatrix[i].msgId;
+            var cosineSimilarity = CosineSimilarity(newMessageVector, vector);
+            if (cosineSimilarity >= threshold && msgId != target.MsgId)
+            { 
+                similarities.Add((cosineSimilarity, msgId));
+            }
         });
 
-        var result = new List<(double similarity, int msgId)>();
-        foreach (var similarity in similarities.OrderDescending())
-        {
-            var msgId = totalVector[Array.IndexOf(similarities, similarity)].MsgId;
-            result.Add((similarity, msgId));
-        }
-        return result;
+        return similarities;
     }
 
     /// <summary>
@@ -69,30 +70,21 @@ public class WordVectorCalculate
         var dotProduct = vecA.DotProduct(vecB);
         var magnitudeA = vecA.L2Norm();
         var magnitudeB = vecB.L2Norm();
-        return dotProduct / (magnitudeA * magnitudeB);
+        var cosineSimilarity = dotProduct / (magnitudeA * magnitudeB);
+        return cosineSimilarity;
     }
 
     /// <summary>
     /// 根据词袋向量集合获取词袋矩阵
     /// </summary>
     /// <param name="bagOfWordVectors">词袋向量集合</param>
-    /// <param name="columnCount">矩阵列数</param>
     /// <returns></returns>
-    private DenseMatrix GetDenseMatrix(List<BagOfWordVector> bagOfWordVectors, int columnCount)
+    private (Vector<double> vector, int msgId)[] UnfoldVectorList(List<BagOfWordVector> bagOfWordVectors)
     {
-        var rowCount = bagOfWordVectors.Count;
-        var denseMatrixArray = new double[rowCount, columnCount];
-
-        var rowList = bagOfWordVectors.Select(UnfoldVector).ToList();
-        for (var rowIndex = 0; rowIndex < rowList.Count; rowIndex++)
+        return bagOfWordVectors.Select(x =>
         {
-            for (var columnIndex = 0; columnIndex < rowList[rowIndex].Length; columnIndex++)
-            {
-                var row = rowList[rowIndex];
-                denseMatrixArray[rowIndex, columnIndex] = row[columnIndex];
-            }
-        }
-
-        return DenseMatrix.OfArray(denseMatrixArray);
+            var vector = Vector<double>.Build.Dense(UnfoldVector(x));
+            return (vector, x.MsgId);
+        }).ToArray();
     }
 }
