@@ -141,7 +141,7 @@ public class MessageProcess : HostDatabaseSupport
                 return;
             }
 
-            if (!RepeaterTrigger(bagOfWordVector, msgRecord, out var result))
+            if (!RepeaterTrigger(bagOfWordVector, messageChain, msgRecord, out var result))
             {
                 return;
             }
@@ -174,15 +174,16 @@ public class MessageProcess : HostDatabaseSupport
     /// 但是缺没有找到相似消息, 那下一次就会强制触发, 直到触发了一次为止
     /// </summary>
     /// <param name="allVector">要做匹配的向量集</param>
+    /// <param name="messageChain">源消息链</param>
     /// <param name="msgRecord">当前消息</param>
     /// <param name="result">触发复读时找到的相似详细</param>
     /// <returns></returns>
-    private bool RepeaterTrigger(List<BagOfWordVector> allVector, MsgRecord msgRecord,
+    private bool RepeaterTrigger(List<BagOfWordVector> allVector, MessageChain messageChain, MsgRecord msgRecord,
         out (double similarity, MsgRecord? repeaterMsg) result)
     {
         result = (0, null);
 
-        if (!TryToTrigger(msgRecord, out var nstTriggerRecord))
+        if (!TryToTrigger(msgRecord, messageChain, out var nstTriggerRecord))
         {
             return false;
         }
@@ -216,17 +217,19 @@ public class MessageProcess : HostDatabaseSupport
         nstTriggerRecord.LastTriggered = DateTime.Now;
         return true;
     }
-    
+
     /// <summary>
     /// 尝试触发操作。
     /// </summary>
     /// <param name="msgRecord">消息记录对象。</param>
+    /// <param name="messageChain"></param>
     /// <param name="nstTriggerRecord">触发记录输出参数。</param>
     /// <returns>如果触发成功，返回 true；否则返回 false。</returns>
     /// <remarks>
     /// 该方法根据消息记录和一定的几率（以及强制触发条件）决定是否触发某一操作。
     /// </remarks>
-    private bool TryToTrigger(MsgRecord msgRecord, [MaybeNullWhen(false)] out NstTriggerRecord nstTriggerRecord)
+    private bool TryToTrigger(MsgRecord msgRecord, MessageChain messageChain,
+        [MaybeNullWhen(false)] out NstTriggerRecord nstTriggerRecord)
     {
         // 初始化'强制触发'标志，默认为false
         var isForceTrigger = false;
@@ -255,6 +258,13 @@ public class MessageProcess : HostDatabaseSupport
             if (nstTriggerRecord.TriggerFailedCount >= 3)
             {
                 Host.Info($"{nstTriggerRecord.Uin}-{nstTriggerRecord.TriggerFailedCount}: isForceTrigger: true");
+                isForceTrigger = true;
+            }
+
+            // 如果Bot被At则强制触发
+            if (messageChain.Any(x => x is MentionEntity mentionEntity && mentionEntity.Uin == Host.MeowBot.BotUin))
+            {
+                Host.Info($"At Bot: isForceTrigger: true");
                 isForceTrigger = true;
             }
         }

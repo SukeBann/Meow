@@ -251,6 +251,8 @@ public class BagOfWordManager : HostDatabaseSupport
 
         // 清空词袋
         bow.BagOfWord.Clear();
+        const int maxBowCount = 10000;
+        bow.MaxCount = maxBowCount;
 
         // 遍历所有记录，对其文本消息进行分词处理，并添加到词袋中
         foreach (var msg in records)
@@ -612,7 +614,7 @@ public class BagOfWordManager : HostDatabaseSupport
         Func<List<BagOfWordVector>, List<(double similarity, int msgId)>> pageData)
     {
         var currentPage = 1; // 当前页码
-        const int pageSize = 3000; // 每页的数据量
+        const int pageSize = 5000; // 每页的数据量
         List<BagOfWordVector>? page = null;
         var result = new List<(double, int)>();
         do
