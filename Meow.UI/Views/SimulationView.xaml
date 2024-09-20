@@ -1,0 +1,37 @@
+﻿<UserControl x:Class="Meow.UI.Views.SimulationView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:local="clr-namespace:Meow.UI.Views"
+             xmlns:viewModels="clr-namespace:Meow.UI.ViewModels"
+             xmlns:pu="clr-namespace:Panuon.WPF.UI;assembly=Panuon.WPF.UI"
+             xmlns:models="clr-namespace:Meow.UI.ViewModels.Models"
+             mc:Ignorable="d"
+             FontFamily="Maple Mono SC NF"
+             FontSize="15"
+             d:DataContext="{d:DesignInstance viewModels:SimulationViewModel}"
+             d:DesignHeight="300" d:DesignWidth="300">
+    <WrapPanel>
+        <TabControl ItemsSource="{Binding ChatSession}"
+                    Margin="0, 25, 0, 0"
+                    pu:TabControlHelper.CornerRadius="0"
+                    pu:TabControlHelper.ItemsSelectedBackground="{DynamicResource SnippetHoverBrush}"
+                    pu:TabControlHelper.ItemsWidth="100"
+                    BorderThickness="0"
+                    Background="Transparent">
+            <TabControl.ItemTemplate>
+                <DataTemplate>
+                    <TextBlock Text="{Binding DisplayName}" />
+                </DataTemplate>
+            </TabControl.ItemTemplate>
+            <TabControl.ContentTemplate>
+                <DataTemplate>
+                   <local:OutputView DataContext="{Binding .}"></local:OutputView>
+                </DataTemplate>
+            </TabControl.ContentTemplate>
+        </TabControl>
+        
+        <Button Content="+"/>
+    </WrapPanel>
+</UserControl>

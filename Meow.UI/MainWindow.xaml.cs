@@ -9,6 +9,7 @@ using Meow.Plugin.NeverStopTalkingPlugin;
 using Meow.Plugin.PermissionPlugin;
 using Meow.UI.Utils;
 using Meow.UI.ViewModels;
+using Meow.UI.Views;
 using Meow.Utils;
 using Serilog;
 
@@ -59,5 +60,10 @@ public partial class MainWindow
         littleTang.LoadPlugin(new NeverStopTalkingPlugin());
 
         await littleTang.Login().ConfigureAwait(false);
+        Application.Current.Dispatcher.Invoke(() =>
+        {
+            var simulationViewModel = new SimulationView(littleTang);
+            simulationViewModel.Show();
+        });
     }
 }

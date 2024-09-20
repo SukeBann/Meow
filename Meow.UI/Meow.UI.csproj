@@ -23,6 +23,14 @@
       <Resource Include="Style\Resource\Font\MapleMono-SC-NF-Regular.ttf">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Resource>
+      <None Remove="Style\Resource\Font\MeowIconFont.ttf" />
+      <Resource Include="Style\Resource\Font\MeowIconFont.ttf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Resource>
+      <None Remove="Style\Resource\Font\MeowIconFont.json" />
+      <Resource Include="Style\Resource\Font\MeowIconFont.json">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Resource>
     </ItemGroup>
 
 </Project>

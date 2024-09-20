@@ -8,6 +8,7 @@
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="/Style/Fontfamily.xaml"/>
+                <ResourceDictionary Source="/Style/PseudocodeSnippetBrush.xaml"/>
                 <pu:StyleDictionary Includes="All" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>

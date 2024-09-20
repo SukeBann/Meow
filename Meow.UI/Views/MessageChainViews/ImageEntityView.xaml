@@ -1,0 +1,29 @@
+﻿<UserControl x:Class="Meow.UI.Views.MessageChainViews.ImageEntityView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:local="clr-namespace:Meow.UI.Views.MessageChainViews"
+             xmlns:entity="clr-namespace:Lagrange.Core.Message.Entity;assembly=Lagrange.Core"
+             mc:Ignorable="d"
+             x:Name="ImageEntityViewUserControl"
+             d:DesignHeight="300" d:DesignWidth="300">
+    <Grid>
+        <Button Content="&#xe900;"
+                      Height="40"
+                      Width="40"
+                      FontSize="22"
+                      Foreground="{DynamicResource SymbolBrush}"
+                      Background="Transparent"
+                   x:Name="ImageShowIcon"
+                   Click="ImageShowIcon_OnClick"
+                   FontFamily="{StaticResource IconFont}"/>
+        <Popup PlacementTarget="{Binding ElementName=ImageShowIcon}"
+               Placement="Top"
+            StaysOpen="False" x:Name="Popup">
+            <Image x:Name="NetworkImage"
+                   MaxWidth="320"
+                   MaxHeight="320"/>
+        </Popup>
+    </Grid>
+</UserControl>

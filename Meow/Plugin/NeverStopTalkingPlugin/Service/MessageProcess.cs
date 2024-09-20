@@ -292,7 +292,8 @@ public class MessageProcess : HostDatabaseSupport
     /// </summary>
     /// <param name="bagOfWordVectors">需要对比哪些向量</param>
     /// <param name="threshold">最低相似度</param>
-    private List<(double similarity, int msgId)> FindMostSimilarMsg(List<BagOfWordVector> bagOfWordVectors, double threshold)
+    private List<(double similarity, int msgId)> FindMostSimilarMsg(List<BagOfWordVector> bagOfWordVectors,
+        double threshold)
     {
         var totalResult = new List<(double similarity, int msgId)>();
         var startTime = DateTime.Now;
@@ -322,26 +323,29 @@ public class MessageProcess : HostDatabaseSupport
     /// </summary>
     private void ComputeMessageVector()
     {
-        foreach (var msgRecord in GetCollection<MsgRecord>(CollStr.NstMessageProcessMsgRecordCollection)
-                     .Find(x => !x.HasDelete && !x.HaveVector))
+        Task.Run(() =>
         {
-            if (TextCutter.CutPlainText(msgRecord.TextMsg, out var filterResult))
+            foreach (var msgRecord in GetCollection<MsgRecord>(CollStr.NstMessageProcessMsgRecordCollection)
+                         .Find(x => !x.HasDelete && !x.HaveVector))
             {
-                continue;
-            }
+                if (TextCutter.CutPlainText(msgRecord.TextMsg, out var filterResult))
+                {
+                    continue;
+                }
 
-            if (filterResult.Length < 2)
-            {
-               continue; 
-            }
+                if (filterResult.Length < 2)
+                {
+                    continue;
+                }
 
-            BagOfWordManager.GetMsgVectors(msgRecord, filterResult);
-            // 如果消息被计算了 就update
-            if (msgRecord.HaveVector)
-            {
-                Update(msgRecord, CollStr.NstMessageProcessMsgRecordCollection);
-                Host.Info("Updated message vector.");
+                BagOfWordManager.GetMsgVectors(msgRecord, filterResult);
+                // 如果消息被计算了 就update
+                if (msgRecord.HaveVector)
+                {
+                    Update(msgRecord, CollStr.NstMessageProcessMsgRecordCollection);
+                    Host.Info("Updated message vector.");
+                }
             }
-        }
+        });
     }
 }

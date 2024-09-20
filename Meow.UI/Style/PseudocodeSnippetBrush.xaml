@@ -1,0 +1,17 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- 伪代码段笔刷 -->
+    
+    <!-- 代码段鼠标悬浮颜色 -->
+    <SolidColorBrush x:Key="SnippetHoverBrush" Color="#223249"/>
+    <!-- 符号(括号 分号等)颜色 -->
+    <SolidColorBrush x:Key="SymbolBrush" Color="Silver"/>
+    <!-- c#关键字颜色 -->
+    <SolidColorBrush x:Key="KeyWordBrush" Color="#957FB8"/>
+    <!-- 类型(返回类型 参数类型)的颜色 -->
+    <SolidColorBrush x:Key="TypeBrush" Color="#7AA89F"/>
+    <!-- 类型(返回类型 参数类型)的颜色 -->
+    <SolidColorBrush x:Key="MethodNameBrush" Color="#7E9CD8"/>
+    <!-- 变量颜色 -->
+    <SolidColorBrush x:Key="VariableBrush" Color="#E6C384"/>
+</ResourceDictionary>

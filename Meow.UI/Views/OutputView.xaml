@@ -1,0 +1,34 @@
+﻿<UserControl x:Class="Meow.UI.Views.OutputView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:local="clr-namespace:Meow.UI.Views"
+             xmlns:models="clr-namespace:Meow.UI.ViewModels.Models"
+             xmlns:pu="clr-namespace:Panuon.WPF.UI;assembly=Panuon.WPF.UI"
+             xmlns:messageChainViews="clr-namespace:Meow.UI.Views.MessageChainViews"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance models:PseudocodeSnippetInfo}"
+             d:DesignHeight="300" d:DesignWidth="300">
+    <Grid>
+        <ScrollViewer VerticalScrollBarVisibility="Visible">
+           <ItemsControl d:DataContext="{d:DesignInstance models:SessionInfo}"
+                         Margin="-1, 25, 0, 0"
+                         Background="Transparent"
+                         BorderThickness="0"
+                         Width="700"
+                         ItemsSource="{Binding MessageRecord}">
+               <ItemsControl.ItemsPanel>
+                   <ItemsPanelTemplate>
+                       <StackPanel></StackPanel>
+                   </ItemsPanelTemplate>
+               </ItemsControl.ItemsPanel>
+               <ItemsControl.ItemTemplate>
+                   <DataTemplate>
+                       <messageChainViews:CodeSnippet DataContext="{Binding}"/>
+                   </DataTemplate>
+               </ItemsControl.ItemTemplate>
+           </ItemsControl>
+        </ScrollViewer>
+    </Grid>
+</UserControl>
