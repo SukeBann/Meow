@@ -13,7 +13,7 @@
     <Grid>
         <ScrollViewer VerticalScrollBarVisibility="Visible">
            <ItemsControl d:DataContext="{d:DesignInstance models:SessionInfo}"
-                         Margin="-1, 25, 0, 0"
+                         Margin="0, 25, 0, 0"
                          Background="Transparent"
                          BorderThickness="0"
                          Width="700"

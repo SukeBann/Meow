@@ -10,6 +10,7 @@
              mc:Ignorable="d"
              FontFamily="Maple Mono SC NF"
              FontSize="15"
+             Background="{DynamicResource MainBackgroundBrush}"
              d:DataContext="{d:DesignInstance viewModels:SimulationViewModel}"
              d:DesignHeight="300" d:DesignWidth="300">
     <WrapPanel>
@@ -27,7 +28,7 @@
             </TabControl.ItemTemplate>
             <TabControl.ContentTemplate>
                 <DataTemplate>
-                   <local:OutputView DataContext="{Binding .}"></local:OutputView>
+                   <local:OutputView DataContext="{Binding .}"/>
                 </DataTemplate>
             </TabControl.ContentTemplate>
         </TabControl>

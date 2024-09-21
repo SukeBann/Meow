@@ -21,10 +21,18 @@ public class SessionInfo
         Host = host;
 
         SubscribeChatMsg();
+
+        EditingMessageChain = messageType switch
+        {
+            MessageChain.MessageType.Group => MessageBuilder.Group(sessionUin).Build(),
+            MessageChain.MessageType.Temp or MessageChain.MessageType.Friend =>
+                MessageBuilder.Friend(sessionUin).Build(),
+            _ => throw new ArgumentOutOfRangeException(nameof(messageType), messageType, null)
+        };
     }
 
     /// <summary>
-    /// 订阅雄安锡
+    /// 订阅消息
     /// </summary>
     /// <exception cref="ArgumentOutOfRangeException"></exception>
     private void SubscribeChatMsg()
@@ -57,7 +65,7 @@ public class SessionInfo
     {
         Application.Current.Dispatcher.Invoke(() =>
         {
-            MessageRecord.Add(new SessionMsgRecord(messageChain));
+            MessageRecord.Add(new SessionMsgRecord(messageChain, SessionUUID));
         });
     }
 
@@ -67,6 +75,11 @@ public class SessionInfo
     private IDisposable? SessionDisposable { get; set; }
     
     private Meow.Core.Meow Host { get; set; }
+    
+    /// <summary>
+    /// 会话唯一ID
+    /// </summary>
+    public string SessionUUID { get; } = Guid.NewGuid().ToString();
 
     /// <summary>
     /// 最大消息容量
@@ -98,7 +111,15 @@ public class SessionInfo
     /// </summary>
     public string DisplayName => SessionRename ?? SessionName;
 
+    /// <summary>
+    /// 会话中的聊天记录
+    /// </summary>
     public FixedCapacityObservableCollection<SessionMsgRecord> MessageRecord { get; } = new(_msgRecordCapacity);
+    
+    /// <summary>
+    /// 编辑中消息
+    /// </summary>
+    public MessageChain EditingMessageChain { get; init; }
 
     ~SessionInfo()
     {

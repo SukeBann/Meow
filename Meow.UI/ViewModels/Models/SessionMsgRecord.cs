@@ -9,10 +9,11 @@ namespace Meow.UI.ViewModels.Models;
 [AddINotifyPropertyChangedInterface]
 public class SessionMsgRecord
 {
-    public SessionMsgRecord(MessageChain rawMessage)
+    public SessionMsgRecord(MessageChain rawMessage, string sessionId)
     {
         RawMessage = rawMessage;
         IsRead = false;
+        SessionId = sessionId; 
         PseudocodeSnippetInfo = new PseudocodeSnippetInfo(rawMessage);
     }
 
@@ -25,6 +26,8 @@ public class SessionMsgRecord
     /// 消息是否被读取
     /// </summary>
     public bool IsRead { get; set; }
+
+    public string SessionId { get; }
     
     /// <summary>
     /// 伪代码段

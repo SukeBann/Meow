@@ -2,6 +2,7 @@
 using System.Windows.Controls;
 using Lagrange.Core.Message;
 using Lagrange.Core.Message.Entity;
+using Meow.UI.ViewModels;
 using Meow.UI.ViewModels.Models;
 using Brushes = System.Windows.Media.Brushes;
 using Button = System.Windows.Controls.Button;
@@ -68,11 +69,29 @@ public partial class CodeSnippet : UserControl
     /// <exception cref="NotImplementedException"></exception>
     private void Reply_OnClick(object sender, RoutedEventArgs e)
     {
-        throw new NotImplementedException();
+        if (DataContext is not SessionMsgRecord sessionMsgRecord)
+        {
+            return;
+        }
+
+        if (!SimulationViewModel.GetSessionById(sessionMsgRecord.SessionId, out var simulationSession))
+        {
+            return;
+        }
+        
+        
+        simulationSession.EditingMessageChain.Add(new ForwardEntity(sessionMsgRecord.RawMessage));
     }
 
+    /// <summary>
+    /// 删除一条记录
+    /// </summary>
+    /// <param name="sender"></param>
+    /// <param name="e"></param>
     private void Delete_OnClick(object sender, RoutedEventArgs e)
     {
-        throw new NotImplementedException();
+        // 表面上是删除其实是隐藏
+        // 等有必要改成真正地删除再改
+        Visibility = Visibility.Collapsed;
     }
 }

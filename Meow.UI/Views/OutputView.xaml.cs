@@ -1,9 +1,4 @@
-﻿using System.Windows;
-using System.Windows.Controls;
-using Lagrange.Core.Message;
-using Lagrange.Core.Message.Entity;
-using Meow.UI.ViewModels.Models;
-using Meow.UI.Views.MessageChainViews;
+﻿using System.Windows.Controls;
 
 namespace Meow.UI.Views;
 
