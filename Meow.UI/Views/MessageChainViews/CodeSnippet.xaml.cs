@@ -9,7 +9,7 @@ using Button = System.Windows.Controls.Button;
 
 namespace Meow.UI.Views.MessageChainViews;
 
-public partial class CodeSnippet : UserControl
+public partial class CodeSnippet
 {
     public CodeSnippet()
     {
@@ -31,11 +31,11 @@ public partial class CodeSnippet : UserControl
     {
         foreach (var messageEntity in messageChain)
         {
-            UIElement? uiElement = messageEntity switch
+            UIElement uiElement = messageEntity switch
             {
-                TextEntity textEntity => new TextBlock() {Text = textEntity.Text, Foreground = Brushes.White},
+                TextEntity textEntity => new TextBlock {Text = textEntity.Text, Foreground = Brushes.White},
                 ImageEntity imageEntity => new ImageEntityView(imageEntity),
-                _ => new TextBlock() {Text = $"[{messageEntity.GetType()}]"}
+                _ => new TextBlock{Text = $"[{messageEntity.GetType()}]"}
             };
 
             MessageContainer.Children.Add(uiElement);
@@ -78,7 +78,6 @@ public partial class CodeSnippet : UserControl
         {
             return;
         }
-        
         
         simulationSession.EditingMessageChain.Add(new ForwardEntity(sessionMsgRecord.RawMessage));
     }

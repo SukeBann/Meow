@@ -84,7 +84,7 @@ public class SessionInfo
     /// <summary>
     /// 最大消息容量
     /// </summary>
-    private const int _msgRecordCapacity = 1000;
+    private const int _msgRecordCapacity = 100;
     
     /// <summary>
     /// 会话中的消息类型

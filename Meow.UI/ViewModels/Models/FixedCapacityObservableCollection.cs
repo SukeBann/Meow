@@ -29,7 +29,12 @@ public class FixedCapacityObservableCollection<T> : ObservableCollection<T>
         if (Count >= _capacity)
         {
             RemoveAt(0);
+            if (index > Count)
+            {
+                index = Count;
+            }
         }
+        
         base.InsertItem(index, item);
     }
 }
