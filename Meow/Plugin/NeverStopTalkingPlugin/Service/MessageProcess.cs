@@ -107,13 +107,6 @@ public class MessageProcess : HostDatabaseSupport
 
         async Task Process(MessageChain messageChain)
         {
-            // 超过15秒的消息不回复
-            var msgTime = messageChain.Time.Add(TimeSpan.FromHours(8));
-            if (DateTime.Now - msgTime > TimeSpan.FromSeconds(15))
-            {
-                return;
-            }
-
             if (IsBowManagerBusy)
             {
                 return;
@@ -245,6 +238,13 @@ public class MessageProcess : HostDatabaseSupport
 
         // 查找与当前消息对应的触发记录
         nstTriggerRecord = TriggerRecords.FirstOrDefault(x => x.Uin == uin && x.BagOfWordType == bagOfWordType);
+
+        // 超过15秒间隔的消息不回复
+        var msgTime = messageChain.Time.Add(TimeSpan.FromHours(8));
+        if (DateTime.Now - msgTime > TimeSpan.FromSeconds(15))
+        {
+            return false;
+        }
 
         // 如果没有找到对应的触发记录，则创建一个新的记录并添加到列表中
         if (nstTriggerRecord is null)

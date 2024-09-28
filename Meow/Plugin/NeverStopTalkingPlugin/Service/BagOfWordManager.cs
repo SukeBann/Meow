@@ -522,7 +522,7 @@ public class BagOfWordManager : HostDatabaseSupport
     /// </summary>
     /// <param name="words">需要计算词向量的单词列表</param>
     /// <param name="bagOfWordRecord">词袋记录</param>
-    /// <returns>计算结果 MaxCount List[(index, count)]代表向量中有值位置的索引与技术></returns>
+    /// <returns>计算结果 MaxCount:代表计算时词袋的最大容积, VectorElementIndex(index, count)[]: 代表向量中有值位置的索引与技术></returns>
     /// <exception cref="ArgumentNullException">当词袋记录或单词列表为空时抛出异常</exception>
     /// <exception cref="InvalidOperationException">当词袋没有填满时抛出异常</exception>
     private (int MaxCount, VectorElementIndex[] VectorElementIndex) CalculateWordVector(string[] words,
