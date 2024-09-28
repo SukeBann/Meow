@@ -72,8 +72,14 @@ public partial class Meow
     /// <param name="plugin"></param>
     private bool LoadCommand(IMeowPlugin plugin)
     {
+        if (!plugin.HaveAnyCommands)
+        {
+            return false;
+        }
+        
         if (plugin.Commands.Any(pluginCommand => CommandDict.ContainsKey(pluginCommand.CommandUid)))
         {
+            Info($"插件: {plugin.PluginName}命令加载失败, 无法重复加载相同Uid的命令");
             return false;
         }
 

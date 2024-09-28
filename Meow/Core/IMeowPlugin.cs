@@ -31,6 +31,11 @@ public interface IMeowPlugin
     public List<IMeowCommand> Commands { get; }
     
     /// <summary>
+    /// 该插件是否包含任何命令
+    /// </summary>
+    public bool HaveAnyCommands => Commands?.Count > 0;
+    
+    /// <summary>
     /// 将插件实例注入meow实例 
     /// </summary>
     public void InjectPlugin(Meow host);

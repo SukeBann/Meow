@@ -33,6 +33,9 @@ public abstract class PluginBase : IMeowPlugin
     public virtual List<IMeowCommand> Commands { get; }
 
     /// <inheritdoc />
+    public virtual bool HaveAnyCommands => Commands?.Count > 0;
+
+    /// <inheritdoc />
     public virtual void InjectPlugin(Meow host)
     {
         Host = host;
@@ -40,7 +43,7 @@ public abstract class PluginBase : IMeowPlugin
     }
 
     /// <summary>
-    /// 订阅消息
+    /// 订阅命令
     /// </summary>
     protected virtual void SubscribeCommand()
     {
