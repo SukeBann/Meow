@@ -1,5 +1,6 @@
 ﻿using Lagrange.Core.Message;
 using Meow.Core;
+using Meow.Utils;
 
 namespace Meow.Plugin.PermissionPlugin;
 
@@ -34,6 +35,7 @@ public class EditPermissionCommand : IMeowCommand
     public Task<(bool needSendMessage, MessageChain messageChain)> RunCommand(Core.Meow meow, MessageChain messageChain,
         string? args)
     {
-        throw new NotImplementedException();
+        // throw new NotImplementedException();
+        return Task.FromResult((true, messageChain.CreateSameTypeTextMessage("还没做好")));
     }
 }

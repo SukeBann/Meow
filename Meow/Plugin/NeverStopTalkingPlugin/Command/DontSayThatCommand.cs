@@ -57,22 +57,6 @@ public class NstDontSayThatCommand(ForbiddenWordsManager forbiddenWordsManager) 
             return Task.FromResult((true, errorMessageChain));
         }
 
-        // TODO 检查上面的参数检查类是否正常工作
-        // if (args.IsNullOrEmpty())
-        // {
-        //     emptyMessage.Text("命令参数不能为空");
-        //     emptyMessage.Build();
-        //     return (true, emptyMessage.Build());
-        // }
-        //
-        // var splitArgs = args!.Split(' ', 2);
-        // if (splitArgs is not ["add" or "remove", _] && splitArgs[1].Length is >= 1 and <= 4)
-        // {
-        //     emptyMessage.Text("参数错误, 第1个参数必须是add或者remove, 第二个参数违禁词的长度必须大于等于1 小于等于4");
-        //     emptyMessage.Build();
-        //     return (true, emptyMessage.Build());
-        // }
-
         var action = splitResult[0];
         var forbiddenWord = splitResult[1];
         if (action == "add")
