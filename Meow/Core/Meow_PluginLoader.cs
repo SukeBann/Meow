@@ -51,14 +51,11 @@ public partial class Meow
         {
             throw new Exception($"{plugin.PluginName}:不能重复加载相同UID插件: {plugin.PluginUid}");
         }
-        if (!LoadCommand(plugin))
-        {
-            throw new Exception($"{plugin.PluginName}:加载插件失败, 命令Uid重复: {plugin.PluginUid}");
-        }
-        
+
+        TryLoadCommand(plugin);
         plugin.InjectPlugin(this);
         UpdatePluginPermission(plugin);
-        LoadCommand(plugin);
+        
         PluginDict.Add(plugin.PluginUid, plugin);
         Plugins.Add(plugin);
         var random = new Random().Next(0, 10000);
@@ -70,21 +67,21 @@ public partial class Meow
     /// 加载命令
     /// </summary>
     /// <param name="plugin"></param>
-    private bool LoadCommand(IMeowPlugin plugin)
+    private void TryLoadCommand(IMeowPlugin plugin)
     {
         if (!plugin.HaveAnyCommands)
         {
-            return false;
+            return;
         }
         
         if (plugin.Commands.Any(pluginCommand => CommandDict.ContainsKey(pluginCommand.CommandUid)))
         {
-            Info($"插件: {plugin.PluginName}命令加载失败, 无法重复加载相同Uid的命令");
-            return false;
+            var message = $"插件: {plugin.PluginName}命令加载失败, 无法重复加载相同Uid的命令";
+            Info(message);
+            throw new Exception(message);
         }
 
         CommandDict.AddRange(plugin.Commands.ToDictionary(c => c.CommandUid, c => c));
-        return true;
     }
 
     /// <summary>

@@ -51,6 +51,11 @@ public abstract class PluginBase : IMeowPlugin
         {
             return;
         }
+        // 没有命令就不订阅
+        if (!HaveAnyCommands)
+        {
+            return;
+        }
 
         CommandParserDisposable = Host.OnCommandReceived.ObserveOn(ThreadPoolScheduler.Instance)
             .Subscribe(CommandParser);

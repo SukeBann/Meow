@@ -1,4 +1,5 @@
-﻿using Lagrange.Core.Common;
+﻿using System.Reactive.Linq;
+using Lagrange.Core.Common;
 using Lagrange.Core.Common.Interface.Api;
 using Meow.Bootstrapper;
 using Meow.Plugin;
