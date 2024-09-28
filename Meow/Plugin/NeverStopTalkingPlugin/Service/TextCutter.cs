@@ -1,4 +1,5 @@
-﻿using System.Text.RegularExpressions;
+﻿using System.Diagnostics.CodeAnalysis;
+using System.Text.RegularExpressions;
 using JiebaNet.Segmenter;
 using Lagrange.Core.Message;
 using Lagrange.Core.Message.Entity;
@@ -15,34 +16,34 @@ public partial class TextCutter
     /// <summary>
     /// 停用词
     /// </summary>
-    private HashSet<string> StopWord { get; set; }
+    private HashSet<string> StopWord { get; }
 
     /// <summary>
     /// 违禁词管理器
     /// </summary>
-    private ForbiddenWordsManager ForbiddenWordsManager { get; set; }
+    private ForbiddenWordsManager ForbiddenWordsManager { get; }
 
     /// <summary>
     /// 插件宿主
     /// </summary>
-    private Core.Meow Host { get; set; }
+    private Core.Meow Host { get; }
 
     /// <summary>
     /// 分词器
     /// </summary>
-    private JiebaSegmenter WordCutter { get; set; } = new();
+    private JiebaSegmenter WordCutter { get; } = new();
 
     /// <summary>
     /// 匹配纯英文或数字
     /// </summary>
-    private Regex MatchEnglishAndNumbers { get; set; } = En_Num_Pattern();
+    private Regex MatchEnglishAndNumbers { get; } = En_Num_Pattern();
 
     /// <summary>
     /// 匹配表情
     /// </summary>
-    private readonly Regex EmojiPattern = GEmojiPattern();
+    private readonly Regex _emojiPattern = GEmojiPattern();
 
-    [GeneratedRegex(@"^[a-zA-Z0-9]+$")]
+    [GeneratedRegex("^[a-zA-Z0-9]+$")]
     private static partial Regex En_Num_Pattern();
 
     // ReSharper disable once StringLiteralTypo
@@ -70,12 +71,11 @@ public partial class TextCutter
                 messageChain.Where(x => x is TextEntity)
                     .Select(x => x.ToPreviewText()))
             .Trim()
-            .Replace(Environment.NewLine, "")
             .Replace("\r", "")
             .Replace("\n", "");
 
         // 不去掉这些表情 消息存储进LiteDb会报错
-        return EmojiPattern.Replace(rawData, string.Empty);
+        return _emojiPattern.Replace(rawData, string.Empty);
     }
 
     /// <summary>
@@ -126,7 +126,7 @@ public partial class TextCutter
     /// <param name="textMessage"></param>
     /// <param name="filterResult"></param>
     /// <returns></returns>
-    public bool CutPlainText(string textMessage, out string[] filterResult)
+    public bool CutPlainText(string textMessage, [MaybeNullWhen(true)]out string[] filterResult)
     {
         var cutResult = WordCutter.Cut(textMessage, cutAll: true)
             .Where(x => !StopWord.Contains(x))
@@ -157,7 +157,9 @@ public partial class TextCutter
     /// <param name="textMessage">输出参数，解析后的文本消息。</param>
     /// <param name="filterResult">输出参数，经过筛选后的结果列表。</param>
     /// <returns>如果消息不需要进一步处理，返回 true；否则返回 false。</returns>
-    public bool GetTextMsg(MessageChain messageChain, out string textMessage, out string[] filterResult)
+    public bool GetTextMsg(MessageChain messageChain,
+        out string textMessage,
+        [MaybeNullWhen(true)] out string[] filterResult)
     {
         filterResult = null;
         textMessage = string.Empty;
