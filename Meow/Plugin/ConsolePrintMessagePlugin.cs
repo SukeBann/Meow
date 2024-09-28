@@ -5,10 +5,12 @@ using Lagrange.Core.Event;
 using Lagrange.Core.Message;
 using Meow.Core;
 using Meow.Core.Model.Base;
-using ArgumentOutOfRangeException = System.ArgumentOutOfRangeException;
 
 namespace Meow.Plugin;
 
+/// <summary>
+/// 将Bot接收到的消息输出到对应Bot的控制台输出中
+/// </summary>
 public partial class ConsolePrintMessagePlugin : PluginBase
 {
     /// <inheritdoc />
@@ -20,13 +22,17 @@ public partial class ConsolePrintMessagePlugin : PluginBase
     /// <inheritdoc />
     public override string PluginDescription => "提供将接收到的消息链打印到控制台的功能";
 
+    /// <summary>
+    /// 释放消息接收
+    /// </summary>
     private IDisposable? MessageReceivedDisposable { get; set; }
 
+    /// <inheritdoc />
     public override bool IsNeedAdmin => false;
 
     /// <inheritdoc />
     public override List<IMeowCommand> Commands { get; } = new();
-    
+
     /// <summary>
     /// 匹配控制字符
     /// </summary>
@@ -37,30 +43,39 @@ public partial class ConsolePrintMessagePlugin : PluginBase
     /// <inheritdoc />
     public override void InjectPlugin(Core.Meow host)
     {
-        base.InjectPlugin(host); 
+        base.InjectPlugin(host);
         MessageReceivedDisposable = Host.OnMessageReceived
             .ObserveOn(ThreadPoolScheduler.Instance)
             .Subscribe(Handle);
     }
 
-    private void Handle((Core.Meow meow, MessageChain messageChain, MessageChain.MessageType messageType) @event)
+    private static void Handle((Core.Meow meow, MessageChain messageChain, MessageChain.MessageType messageType) @event)
     {
         var (meow, messageChain, messageType) = @event;
 
-        var group = meow.BotGroups.FirstOrDefault(x => x.GroupUin == messageChain.GroupUin);
-        var groupGroupName = group?.GroupName ?? group?.GroupUin.ToString() ?? "KnownGroup";
-        var memberName = messageChain?.GroupMemberInfo?.MemberCard ?? messageChain?.GroupMemberInfo?.MemberName ?? "KnownMember";
-        memberName = memberName.Replace(Environment.NewLine, "").Trim();
-        var friendName = messageChain?.FriendInfo?.Nickname ?? messageChain?.FriendInfo?.Uin.ToString() ?? "KnownFriend";
-        var output = messageType switch
+        string? output;
+        switch (messageType)
         {
-            MessageChain.MessageType.Group =>
-                $"{Environment.NewLine}G[{groupGroupName}]-[{memberName}]{Environment.NewLine}{messageChain.ToPreviewText()}",
-            MessageChain.MessageType.Temp =>
-                $"{Environment.NewLine}T[{groupGroupName}]-[{memberName}|{friendName}]{Environment.NewLine}{messageChain.ToPreviewText()}",
-            MessageChain.MessageType.Friend => $"{Environment.NewLine}F[{friendName}]{Environment.NewLine}{messageChain.ToPreviewText()}",
-            _ => throw new ArgumentOutOfRangeException(nameof(messageType), "未知的消息类型, 无法正确解析")
-        };
+            case MessageChain.MessageType.Group:
+            case MessageChain.MessageType.Temp:
+                var group = meow.BotGroups.FirstOrDefault(x => x.GroupUin == messageChain.GroupUin);
+                var groupName = group?.GroupName ?? group?.GroupUin.ToString() ?? "KnownGroup";
+                var groupMemberName = messageChain?.GroupMemberInfo?.MemberCard ??
+                                  messageChain?.GroupMemberInfo?.MemberName ?? "KnownMember";
+                groupMemberName = groupMemberName.Replace(Environment.NewLine, "").Trim();
+                var msgSymbol = messageType is MessageChain.MessageType.Temp ? "T" : "G";
+                output =
+                    $"{Environment.NewLine}{msgSymbol}[{groupName}]-[{groupMemberName}]{Environment.NewLine}{messageChain?.ToPreviewText()}";
+                break;
+            case MessageChain.MessageType.Friend:
+                var friendName = messageChain?.FriendInfo?.Nickname ??
+                                 messageChain?.FriendInfo?.Uin.ToString() ?? "KnownFriend";
+                output = $"{Environment.NewLine}F[{friendName}]{Environment.NewLine}{messageChain?.ToPreviewText()}";
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(messageType), "未知的消息类型, 无法正确解析");
+        }
+
         // 如果不替换掉的话 在WPF的RichTextBox输出中会报错
         output = MatchEmojiUnicode().Replace(output, string.Empty);
         try
@@ -69,7 +84,7 @@ public partial class ConsolePrintMessagePlugin : PluginBase
         }
         catch (Exception e)
         {
-            meow.Error("插入日志失败");
+            meow.Error("插入日志失败", e);
         }
     }
 
