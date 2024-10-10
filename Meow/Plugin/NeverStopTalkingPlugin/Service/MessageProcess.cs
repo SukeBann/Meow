@@ -118,9 +118,9 @@ public class MessageProcess : HostDatabaseSupport
             }
 
             var msgRecord = BagOfWordManager.ProcessCutResult(messageChain, textMessage, filterResult);
-            // 计算完消息向量, 先保存
-            Insert(msgRecord, CollStr.NstMessageProcessMsgRecordCollection);
             var bagOfWordVector = BagOfWordManager.GetMsgVectors(msgRecord, filterResult);
+            // 计算完消息向量, 先保存, 如果获取到了消息向量 就会被表示为拥有消息向量
+            Insert(msgRecord, CollStr.NstMessageProcessMsgRecordCollection);
 
             if (bagOfWordVector.Count < 1)
             {
