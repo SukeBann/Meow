@@ -41,7 +41,6 @@ public class MessageProcess : HostDatabaseSupport
 
         ComputeMessageVector();
         StartProcessTask();
-        Host.SendMessage(MessageBuilder.Friend(1052700448).Text("Link Start").Build());
     }
 
     #region properties
@@ -118,12 +117,6 @@ public class MessageProcess : HostDatabaseSupport
                 return;
             }
 
-            // 不在处理分词结果小于1的句子
-            if (filterResult.Length < 2)
-            {
-                return;
-            }
-
             var msgRecord = BagOfWordManager.ProcessCutResult(messageChain, textMessage, filterResult);
             // 计算完消息向量, 先保存
             Insert(msgRecord, CollStr.NstMessageProcessMsgRecordCollection);
@@ -151,14 +144,13 @@ public class MessageProcess : HostDatabaseSupport
     }
 
     /// <summary>
-    /// 处理消息链
+    /// 消息入队
     /// </summary>
     /// <param name="messageChain">消息链</param>
     /// <returns></returns>
-    public (bool isSendBack, MessageChain messageChain) ProcessMessage(MessageChain messageChain)
+    public void EnqueueMessage(MessageChain messageChain)
     {
         ConcurrentQueue.Enqueue(messageChain);
-        return (false, messageChain);
     }
 
     /// <summary>
@@ -329,11 +321,6 @@ public class MessageProcess : HostDatabaseSupport
                          .Find(x => !x.HasDelete && !x.HaveVector))
             {
                 if (TextCutter.CutPlainText(msgRecord.TextMsg, out var filterResult))
-                {
-                    continue;
-                }
-
-                if (filterResult.Length < 2)
                 {
                     continue;
                 }

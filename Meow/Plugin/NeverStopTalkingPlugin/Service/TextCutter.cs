@@ -146,7 +146,8 @@ public partial class TextCutter
         // 全部转为小写, liteDB 狗屎数据库 存储字典的时候会把字典里面的键忽略大小写
         filterResult = cutResult.Select(x => x.ToLower()).ToArray();
 
-        return filterResult.Length < 1;
+        // 分词数量小于2的视为没有分到词
+        return filterResult.Length < 2;
     }
     
     

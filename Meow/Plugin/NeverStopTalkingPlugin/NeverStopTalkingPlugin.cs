@@ -43,11 +43,6 @@ public class NeverStopTalkingPlugin : PluginBase
     public override string PluginUid => "8E1F9C63-CB6C-4232-B617-09DAA73F8910";
 
     /// <summary>
-    /// 违禁词管理器
-    /// </summary>
-    private ForbiddenWordsManager ForbiddenWordsManager { get; set; }
-    
-    /// <summary>
     /// 消息处理器
     /// </summary>
     private MessageProcess? MessageProcess { get; set; }
@@ -55,34 +50,31 @@ public class NeverStopTalkingPlugin : PluginBase
     /// <inheritdoc />
     public override List<IMeowCommand> Commands { get; } = new(){};
 
-    private IDisposable MessageProcessDisposable { get; set; }
+    private IDisposable? MessageProcessDisposable { get; set; }
 
     /// <inheritdoc />
     public override void InjectPlugin(Core.Meow host)
     {
-        base.InjectPlugin(host);
-        ForbiddenWordsManager = new ForbiddenWordsManager(host);
-        var textCutter = new TextCutter(host, ForbiddenWordsManager);
+        var forbiddenWordsManager = new ForbiddenWordsManager(host);
+        var textCutter = new TextCutter(host, forbiddenWordsManager);
         var nstBagOfWordManager = new BagOfWordManager(host, textCutter);
 
-        Commands.Add(new NstDontSayThatCommand(ForbiddenWordsManager));
+        Commands.Add(new NstDontSayThatCommand(forbiddenWordsManager));
         Commands.Add(new BagOfWordCommand(host, nstBagOfWordManager));
         
         MessageProcess = new MessageProcess(nstBagOfWordManager, textCutter, host);
-        MessageProcessDisposable = Host!.OnMessageReceived.Subscribe(async x =>
+        MessageProcessDisposable = host.OnMessageReceived.Subscribe(x =>
         {
-            var (isSendBack, messageChain) = MessageProcess.ProcessMessage(x.messageChain);
-            if (isSendBack)
-            {
-                await Host.SendMessage(messageChain).ConfigureAwait(false);
-            }
+            MessageProcess.EnqueueMessage(x.messageChain);
         });
+        
+        base.InjectPlugin(host);
     }
 
     /// <inheritdoc />
     public override void Remove()
     {
-        MessageProcessDisposable.Dispose();
+        MessageProcessDisposable?.Dispose();
         base.Remove();
     }
 }

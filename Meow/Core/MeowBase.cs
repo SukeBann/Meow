@@ -52,7 +52,7 @@ public abstract class MeowBase
             return;
         }
 
-        var fetchQrCode = await MeowBot.FetchQrCode().ConfigureAwait(false);
+        var fetchQrCode = await MeowBot.FetchQrCode();
         if (fetchQrCode != null)
         {
             var path = Path.Combine(WorkFolder, "qr.png");

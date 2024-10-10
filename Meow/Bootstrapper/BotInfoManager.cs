@@ -9,6 +9,11 @@ namespace Meow.Bootstrapper;
 /// </summary>
 public static class BotInfoManager
 {
+    private static readonly JsonSerializerOptions JsonSerializerOptions = new()
+    {
+        ReferenceHandler = ReferenceHandler.Preserve
+    };
+
     /// <summary>
     /// 检查配置文件目录[不存在会创建路径], 并返回合并的配置文件路径
     /// </summary>
@@ -52,11 +57,10 @@ public static class BotInfoManager
     /// 保存设备信息
     /// </summary>
     /// <returns></returns>
-    public static BotDeviceInfo SaveDeviceInfo(string baseFolder, BotDeviceInfo deviceInfo)
+    public static void SaveDeviceInfo(string baseFolder, BotDeviceInfo deviceInfo)
     {
         var deviceInfoPath = GetConfigPath(baseFolder, "DeviceInfo.json");
         File.WriteAllText(deviceInfoPath, JsonSerializer.Serialize(deviceInfo));
-        return deviceInfo;
     }
 
     /// <summary>
@@ -93,12 +97,9 @@ public static class BotInfoManager
             {
                 return new BotKeystore();
             }
-            
+
             var text = File.ReadAllText(keystorePath);
-            return JsonSerializer.Deserialize<BotKeystore>(text, new JsonSerializerOptions()
-            {
-                ReferenceHandler = ReferenceHandler.Preserve
-            }) ?? new BotKeystore();
+            return JsonSerializer.Deserialize<BotKeystore>(text, JsonSerializerOptions) ?? new BotKeystore();
         }
         catch
         {
