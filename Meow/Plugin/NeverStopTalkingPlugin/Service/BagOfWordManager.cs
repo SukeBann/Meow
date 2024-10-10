@@ -269,6 +269,7 @@ public class BagOfWordManager : HostDatabaseSupport
         {
             bow.MaxCount = bow.BagOfWord.Count;
         }
+
         Update(bow, CollStr.NstBagOfWordManagerCollection);
 
         // 如果词袋未填充满，返回提示信息
@@ -292,6 +293,7 @@ public class BagOfWordManager : HostDatabaseSupport
             {
                 Update(msg, CollStr.NstMessageProcessMsgRecordCollection);
             }
+
             Insert(new BagOfWordVector(bow.DbId, type,
                     bow.Uin, msg.DbId,
                     messageMd5, calculatedVector.MaxCount,
@@ -321,7 +323,7 @@ public class BagOfWordManager : HostDatabaseSupport
         out string result)
     {
         result = "查询词袋失败!";
-        
+
         var bagOfWordRecord = BowCollection
             .FindOne(x => x.BagOfWordType == bagOfWordType && x.Uin == uin);
         if (bagOfWordRecord is null)
@@ -427,46 +429,36 @@ public class BagOfWordManager : HostDatabaseSupport
             return bagOfWordVectors;
         }
 
-        if (msgRecord.IsGroupMsg)
+        // 从全局词袋获取向量
+        // 全局词袋只收集这两个群, 并且全局词袋要是满的才收集
+        var validGroupIds = new uint[] {726070631, 587914615};
+        if (msgRecord.IsGroupMsg && validGroupIds.Contains(msgRecord.GroupId) &&
+            FullWordBagInfo.Contains((BagOfWordType.Global, 0)))
         {
-            // 全局词袋只收集这两个群
-            var validGroupIds = new uint[] {726070631, 587914615};
-            if (validGroupIds.Contains(msgRecord.GroupId))
+            var exist = GetCollection<BagOfWordVector>(CollStr.NstBagOfWordVectorCollection)
+                .FindOne(x => x.BagOfWordType == BagOfWordType.Global && x.Uin == 0 && x.MsgMd5 == messageMd5);
+            if (exist is not null)
             {
-                // 所需的词袋没有装满就退出
-                if (!FullWordBagInfo.Contains((BagOfWordType.Global, 0)))
+                msgRecord.HaveVector = true;
+                bagOfWordVectors.Add(exist);
+            }
+            else
+            {
+                if (QueryBagOfWordRecord(out var bow, BagOfWordType.Global, 0, true))
                 {
+                    var calculatedVector = CalculateWordVector(filterResult, bow);
+                    msgRecord.HaveVector = true;
+                    bagOfWordVectors.Add(new BagOfWordVector(bow.DbId, BagOfWordType.Global, 0, msgRecord.DbId,
+                        messageMd5, calculatedVector.MaxCount,
+                        calculatedVector.VectorElementIndex));
                 }
-                else
-                {
-                    var exist = GetCollection<BagOfWordVector>(CollStr.NstBagOfWordVectorCollection)
-                        .FindOne(x => x.BagOfWordType == BagOfWordType.Global && x.Uin == 0 && x.MsgMd5 == messageMd5);
-                    if (exist is not null)
-                    {
-                        msgRecord.HaveVector = true;
-                        bagOfWordVectors.Add(exist);
-                    }
-                    else
-                    {
-                        if (!QueryBagOfWordRecord(out var bow, BagOfWordType.Global, 0, true))
-                        {
-                        }
-                        else
-                        {
-                            var calculatedVector = CalculateWordVector(filterResult, bow);
-                            msgRecord.HaveVector = true;
-                            bagOfWordVectors.Add(new BagOfWordVector(bow.DbId, BagOfWordType.Global, 0, msgRecord.DbId, messageMd5, calculatedVector.MaxCount,
-                                calculatedVector.VectorElementIndex));
-                        }
-                    }
-                }
-
-                // 被计算过就不在计算
             }
         }
 
-        AddBagOfWordVector(BagOfWordType.Personal, msgRecord.DbId, msgRecord.Sender, messageMd5, bagOfWordVectors, msgRecord, filterResult);
-        AddBagOfWordVector(BagOfWordType.Group, msgRecord.DbId, msgRecord.GroupId, messageMd5, bagOfWordVectors, msgRecord, filterResult);
+        AddBagOfWordVector(BagOfWordType.Personal, msgRecord.DbId, msgRecord.Sender, messageMd5, bagOfWordVectors,
+            msgRecord, filterResult);
+        AddBagOfWordVector(BagOfWordType.Group, msgRecord.DbId, msgRecord.GroupId, messageMd5, bagOfWordVectors,
+            msgRecord, filterResult);
 
         if (bagOfWordVectors.Count > 0)
         {
@@ -487,7 +479,8 @@ public class BagOfWordManager : HostDatabaseSupport
     /// <param name="result">被添加进词袋的词向量集合</param>
     /// <param name="msgRecord">消息记录</param>
     /// <param name="filterResult">分词结果</param>
-    void AddBagOfWordVector(BagOfWordType type, int msgId, uint bowUin, string md5, List<BagOfWordVector> result, MsgRecord msgRecord, string[] filterResult)
+    void AddBagOfWordVector(BagOfWordType type, int msgId, uint bowUin, string md5, List<BagOfWordVector> result,
+        MsgRecord msgRecord, string[] filterResult)
     {
         // 所需的词袋没有装满就退出
         if (!FullWordBagInfo.Contains((type, bowUin)))
@@ -551,6 +544,7 @@ public class BagOfWordManager : HostDatabaseSupport
 
                 lastIndex++;
             }
+
             throw new InvalidOperationException("无法使用没有填满的词袋进行词向量计算");
         }
 
