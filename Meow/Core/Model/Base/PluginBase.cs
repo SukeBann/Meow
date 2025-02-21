@@ -1,5 +1,6 @@
 ﻿using System.Reactive.Concurrency;
 using System.Reactive.Linq;
+using System.Runtime.Versioning;
 using Lagrange.Core.Event;
 using Lagrange.Core.Message;
 
@@ -68,22 +69,29 @@ public abstract class PluginBase : IMeowPlugin
     protected virtual async void CommandParser(
         (Meow meow, MessageChain messageChain, EventBase @event, string command, string? args) commandArgs)
     {
-        var (meow, messageChain, _, command, args) = commandArgs;
-        var targetCommand = Commands.FirstOrDefault(x => x.CommandTrigger == command);
-        if (targetCommand is null || !targetCommand.CommandTrigger.Equals(targetCommand!.CommandTrigger))
+        try
         {
-            return;
-        }
+            var (meow, messageChain, _, command, args) = commandArgs;
+            var targetCommand = Commands.FirstOrDefault(x => x.CommandTrigger == command);
+            if (targetCommand is null || !targetCommand.CommandTrigger.Equals(targetCommand!.CommandTrigger))
+            {
+                return;
+            }
 
-        if (!meow.GetUserPermission(messageChain.FriendUin, targetCommand))
-        {
-            return;
-        }
+            if (!meow.GetUserPermission(messageChain.FriendUin, targetCommand))
+            {
+                return;
+            }
 
-        var commandResult = await targetCommand.RunCommand(meow, messageChain, args).ConfigureAwait(false);
-        if (commandResult.needSendMessage)
+            var commandResult = await targetCommand.RunCommand(meow, messageChain, args).ConfigureAwait(false);
+            if (commandResult.needSendMessage)
+            {
+                await meow.SendMessage(commandResult.messageChain).ConfigureAwait(false);
+            }
+        }
+        catch (Exception e)
         {
-            await meow.SendMessage(commandResult.messageChain).ConfigureAwait(false);
+            commandArgs.meow.Error("Error On Command Parser", e);
         }
     }
 

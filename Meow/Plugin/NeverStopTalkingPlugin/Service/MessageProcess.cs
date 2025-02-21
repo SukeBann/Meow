@@ -39,7 +39,7 @@ public class MessageProcess : HostDatabaseSupport
         msgCollection.EnsureIndex(x => x.HaveVector);
         msgCollection.EnsureIndex(x => x.HasDelete);
 
-        ComputeMessageVector();
+        Task.Run(ProcessMessageVector);
         StartProcessTask();
     }
 
@@ -313,26 +313,23 @@ public class MessageProcess : HostDatabaseSupport
     /// <br/> 查询未删除的消息记录
     /// <br/> 对每个消息记录，使用词袋管理器获取消息向量, 并存储进向量集合里面
     /// </summary>
-    private void ComputeMessageVector()
+    private void ProcessMessageVector()
     {
-        Task.Run(() =>
+        foreach (var msgRecord in GetCollection<MsgRecord>(CollStr.NstMessageProcessMsgRecordCollection)
+                     .Find(x => !x.HasDelete && !x.HaveVector))
         {
-            foreach (var msgRecord in GetCollection<MsgRecord>(CollStr.NstMessageProcessMsgRecordCollection)
-                         .Find(x => !x.HasDelete && !x.HaveVector))
+            if (TextCutter.CutPlainText(msgRecord.TextMsg, out var filterResult))
             {
-                if (TextCutter.CutPlainText(msgRecord.TextMsg, out var filterResult))
-                {
-                    continue;
-                }
-
-                BagOfWordManager.GetMsgVectors(msgRecord, filterResult);
-                // 如果消息被计算了 就update
-                if (msgRecord.HaveVector)
-                {
-                    Update(msgRecord, CollStr.NstMessageProcessMsgRecordCollection);
-                    Host.Info("Updated message vector.");
-                }
+                continue;
             }
-        });
+
+            BagOfWordManager.GetMsgVectors(msgRecord, filterResult);
+            // 如果消息被计算了 就update
+            if (msgRecord.HaveVector)
+            {
+                Update(msgRecord, CollStr.NstMessageProcessMsgRecordCollection);
+                Host.Info("Updated message vector.");
+            }
+        }
     }
 }
