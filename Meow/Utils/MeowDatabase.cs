@@ -16,8 +16,21 @@ public class MeowDatabase
         var path = Path.Combine(folderPath, $"{databaseName}.db");
         DatabaseName = databaseName;
         Logger = logger;
+        DatabaseCompression(path);
         Repository = new LiteRepository(path);
         logger.Information("数据库加载完毕:{DatabaseName}, Path:{Path}", databaseName, path);
+    }
+
+    /// <summary>
+    /// 对指定路径的数据库进行压缩操作。
+    /// </summary>
+    /// <param name="path">数据库文件的路径。</param>
+    private static void DatabaseCompression(string path)
+    {
+        var db = new LiteDatabase(path);
+        db.Rebuild();
+        db.Checkpoint();
+        db.Dispose();
     }
 
     private LiteRepository Repository { get; set; }

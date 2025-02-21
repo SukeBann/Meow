@@ -1,6 +1,7 @@
 ﻿using System.Reactive.Concurrency;
 using System.Reactive.Linq;
 using Lagrange.Core.Message;
+using Lagrange.Core.Message.Entity;
 using Meow.Core.Model.Base;
 
 namespace Meow.Plugin.UsagiPlugin;
@@ -31,9 +32,17 @@ public class UsagiPlugin: PluginBase
         host.OnMessageReceived.ObserveOn(ThreadPoolScheduler.Instance).Subscribe(Handle);
     }
 
-    private void Handle((Core.Meow meow, MessageChain messageChain, MessageChain.MessageType messageType) _)
+    private void Handle((Core.Meow meow, MessageChain messageChain, MessageChain.MessageType messageType) @tuple)
     {
-        throw new NotImplementedException();
+        var (meow, messageChain, messageType) = @tuple;
+        if (messageChain.Type is MessageChain.MessageType.Friend && messageChain.FriendUin == 1052700448)
+        {
+            foreach (var imageEntity in messageChain.Where(x => x is ImageEntity).Cast<ImageEntity>())
+            {
+                var imageEntityImageSize = imageEntity.ImageSize;
+                Console.WriteLine();
+            }
+        }
     }
 
     /// <inheritdoc />
