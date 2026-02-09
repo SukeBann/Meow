@@ -1,7 +1,6 @@
 ﻿using Meow.Core;
 using Meow.Core.Model.Base;
 using Meow.Plugin.NeverStopTalkingPlugin.Command;
-using Meow.Plugin.NeverStopTalkingPlugin.Models;
 using Meow.Plugin.NeverStopTalkingPlugin.Service;
 
 namespace Meow.Plugin.NeverStopTalkingPlugin;
@@ -48,7 +47,7 @@ public class NeverStopTalkingPlugin : PluginBase
     private MessageProcess? MessageProcess { get; set; }
 
     /// <inheritdoc />
-    public override List<IMeowCommand> Commands { get; } = new(){};
+    public override List<IMeowCommand> Commands { get; } = [];
 
     private IDisposable? MessageProcessDisposable { get; set; }
 
@@ -76,5 +75,11 @@ public class NeverStopTalkingPlugin : PluginBase
     {
         MessageProcessDisposable?.Dispose();
         base.Remove();
+    }
+
+    private void GetConfigPath(Core.Meow host)
+    {
+        var configDir = Path.Combine(host.WorkFolder, nameof(NeverStopTalkingPlugin));
+        //TODO var hostWorkFolder = ;
     }
 }

@@ -1,18 +1,12 @@
-﻿using System.Collections.Concurrent;
-using System.Diagnostics.CodeAnalysis;
-using System.Diagnostics.Eventing.Reader;
+﻿using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
 using System.Reactive.Subjects;
-using System.Security.Cryptography.X509Certificates;
-using System.Text.RegularExpressions;
-using AngleSharp.Dom;
 using Lagrange.Core.Message;
 using LiteDB;
 using Masuit.Tools;
 using Masuit.Tools.Security;
 using Meow.Core.Model.Base;
 using Meow.Plugin.NeverStopTalkingPlugin.Models;
-using ProtoBuf.Meta;
 
 namespace Meow.Plugin.NeverStopTalkingPlugin.Service;
 
@@ -51,12 +45,12 @@ public class BagOfWordManager : HostDatabaseSupport
     private ILiteCollection<BagOfWordRecord> BowCollection =>
         GetCollection<BagOfWordRecord>(CollStr.NstBagOfWordManagerCollection);
 
-    private TextCutter TextCutter { get; set; }
+    private TextCutter TextCutter { get; }
 
     /// <summary>
     /// 词袋管理器繁忙状态变更
     /// </summary>
-    public ISubject<bool> BoWBusyStateChange { get; set; } = new Subject<bool>();
+    public ISubject<bool> BoWBusyStateChange { get; } = new Subject<bool>();
 
     #region Properties
 
@@ -201,7 +195,7 @@ public class BagOfWordManager : HostDatabaseSupport
             $"类型:{bagOfWordType}\n词袋id:{bagOfWordRecord.DbId}\n总消息数量：{count}\n可构建词袋大小: {totalWord.Count}");
     }
 
-    public IEnumerable<MsgRecord> GetBowAllMsgRecords(Expression<Func<MsgRecord, bool>> recordFilter,
+    private IEnumerable<MsgRecord> GetBowAllMsgRecords(Expression<Func<MsgRecord, bool>> recordFilter,
         int limit = int.MaxValue)
     {
         return GetCollection<MsgRecord>(CollStr.NstMessageProcessMsgRecordCollection).Find(recordFilter, limit: limit);
