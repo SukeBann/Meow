@@ -62,7 +62,7 @@ public abstract class MeowBase
         }
         else
         {
-            Error("获取二维码识别, 无法成功登录");
+            Error("获取二维码失败, 无法成功登录");
         }
     }
 

@@ -1,4 +1,5 @@
-﻿using LiteDB;
+﻿using FreeSql.DataAnnotations;
+using Newtonsoft.Json;
 
 namespace Meow.Core.Model.Base;
 
@@ -10,7 +11,7 @@ public abstract class DatabaseRecordBase
     /// <summary>
     /// 数据库id
     /// </summary>
-    [BsonId]
+    [Column(IsIdentity = true, IsPrimary = true)]
     public int DbId { get; set; }
 
     /// <summary>

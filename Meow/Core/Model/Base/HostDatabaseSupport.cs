@@ -1,4 +1,4 @@
-﻿using LiteDB;
+﻿using FreeSql;
 using Meow.Utils;
 
 namespace Meow.Core.Model.Base;
@@ -11,7 +11,7 @@ public abstract class HostDatabaseSupport
     /// <summary>
     /// 获取此实例操作的MeowDatabase对象。
     /// </summary>
-    private MeowDatabase Database { get; }
+    protected MeowDatabase Database { get; }
 
     protected Meow Host { get; }
 
@@ -26,13 +26,13 @@ public abstract class HostDatabaseSupport
     }
 
     /// <summary>
-    /// 将对象插入到数据库集合中并返回其BsonValue。
+    /// 将对象插入到数据库集合中并返回其ID。
     /// </summary>
     /// <typeparam name="T">要插入的对象的类型。</typeparam>
     /// <param name="target">要插入的对象。</param>
     /// <param name="collectionName">目标数据库集合的名称。</param>
-    /// <returns>插入对象的BsonValue。</returns>
-    protected virtual BsonValue Insert<T>(T target, string collectionName)
+    /// <returns>插入对象的ID。</returns>
+    protected virtual long Insert<T>(T target, string collectionName) where T : class
     {
         return Database.Insert(target, collectionName);
     }
@@ -44,7 +44,7 @@ public abstract class HostDatabaseSupport
     /// <param name="targetList">要插入的对象集合。</param>
     /// <param name="collectionName">目标数据库集合的名称。</param>
     /// <returns>插入对象的数量。</returns>
-    public virtual int InsertCollection<T>(IEnumerable<T> targetList, string collectionName)
+    public virtual int InsertCollection<T>(IEnumerable<T> targetList, string collectionName) where T : class
     {
         return Database.Insert(targetList, collectionName);
     }
@@ -56,7 +56,7 @@ public abstract class HostDatabaseSupport
     /// <param name="target">需要更新的对象。</param>
     /// <param name="collectionName">目标数据库集合的名称。</param>
     /// <returns>如果操作成功返回true。</returns>
-    protected virtual bool Update<T>(T target, string collectionName)
+    protected virtual bool Update<T>(T target, string collectionName) where T : class
     {
         return Database.Update(target, collectionName);
     }
@@ -68,7 +68,7 @@ public abstract class HostDatabaseSupport
     /// <param name="target">需要更新的对象集合。</param>
     /// <param name="collectionName">目标数据库集合的名称。</param>
     /// <returns>更新对象的数量。</returns>
-    protected virtual int UpdateCollection<T>(IEnumerable<T> target, string collectionName)
+    protected virtual int UpdateCollection<T>(IEnumerable<T> target, string collectionName) where T : class
     {
         return Database.Update(target, collectionName);
     }
@@ -79,19 +79,8 @@ public abstract class HostDatabaseSupport
     /// <typeparam name="T">查询对象的类型。</typeparam>
     /// <param name="collectionName">目标数据库集合的名称。</param>
     /// <returns>查询结果。</returns>
-    protected virtual ILiteQueryable<T> Query<T>(string collectionName)
+    protected virtual ISelect<T> Query<T>(string collectionName) where T : class
     {
         return Database.Query<T>(collectionName);
-    }
-
-    /// <summary>
-    /// 获取指定名称的数据库集合。
-    /// </summary>
-    /// <typeparam name="T">集合中的元素类型。</typeparam>
-    /// <param name="collectionName">数据库集合的名称。</param>
-    /// <returns>指定名称的数据库集合。</returns>
-    public ILiteCollection<T> GetCollection<T>(string collectionName)
-    {
-        return Database.GetCollection<T>(collectionName);
     }
 }

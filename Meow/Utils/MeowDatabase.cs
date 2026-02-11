@@ -1,4 +1,4 @@
-﻿using LiteDB;
+﻿using FreeSql;
 using Meow.Core.Model.Base;
 using Serilog;
 
@@ -16,24 +16,28 @@ public class MeowDatabase
         var path = Path.Combine(folderPath, $"{databaseName}.db");
         DatabaseName = databaseName;
         Logger = logger;
-        DatabaseCompression(path);
-        Repository = new LiteRepository(path);
+        
+        FreeSql = new FreeSqlBuilder()
+            .UseConnectionString(DataType.Sqlite, $"Data Source={path}")
+            .UseAutoSyncStructure(true)
+            .Build();
+
+        // 注册 JSON 序列化
+        FreeSql.Aop.ConfigEntityProperty += (s, e) =>
+        {
+            if (e.Property.PropertyType.IsGenericType && 
+                (e.Property.PropertyType.GetGenericTypeDefinition() == typeof(Dictionary<,>) || 
+                 e.Property.PropertyType.GetGenericTypeDefinition() == typeof(List<>)))
+            {
+                e.ModifyResult.StringLength = -1;
+                e.ModifyResult.IsIgnore = false;
+            }
+        };
+
         logger.Information("数据库加载完毕:{DatabaseName}, Path:{Path}", databaseName, path);
     }
 
-    /// <summary>
-    /// 对指定路径的数据库进行压缩操作。
-    /// </summary>
-    /// <param name="path">数据库文件的路径。</param>
-    private static void DatabaseCompression(string path)
-    {
-        var db = new LiteDatabase(path);
-        db.Rebuild();
-        db.Checkpoint();
-        db.Dispose();
-    }
-
-    private LiteRepository Repository { get; set; }
+    public IFreeSql FreeSql { get; private set; }
 
     private ILogger Logger { get; set; }
 
@@ -45,13 +49,13 @@ public class MeowDatabase
     #region CRUD
 
     /// <summary>
-    /// 插入单个对象到数据库集合中，返回插入对象的BsonValue。
+    /// 插入单个对象到数据库集合中，返回插入对象的ID。
     /// </summary>
     /// <typeparam name="T">需要插入的对象类型。</typeparam>
     /// <param name="target">需要插入的对象。</param>
-    /// <param name="collectionName">目标数据库集合的名称。</param>
-    /// <returns>返回插入对象的BsonValue。</returns>
-    public BsonValue Insert<T>(T target, string collectionName)
+    /// <param name="collectionName">目标数据库集合的名称(SQLite中暂不直接使用，但为了兼容性保留)。</param>
+    /// <returns>返回插入对象的ID。</returns>
+    public long Insert<T>(T target, string collectionName) where T : class
     {
         if (target is DatabaseRecordBase record)
         {
@@ -59,9 +63,9 @@ public class MeowDatabase
             record.RefreshUpdateTime();
         }
 
-        var bsonValue = Repository.Insert<T>(target, collectionName);
-        Logger.Debug("Insert Result: {IsSuccess}", bsonValue is not null);
-        return bsonValue;
+        var identity = FreeSql.Insert<T>().AppendData(target).ExecuteIdentity();
+        Logger.Debug("Insert Result ID: {Id}", identity);
+        return identity;
     }
 
     /// <summary>
@@ -71,7 +75,7 @@ public class MeowDatabase
     /// <param name="targetList">需要插入的对象集合。</param>
     /// <param name="collectionName">目标数据库集合的名称。</param>
     /// <returns>返回插入对象的数量。</returns>
-    public int Insert<T>(IEnumerable<T> targetList, string collectionName)
+    public int Insert<T>(IEnumerable<T> targetList, string collectionName) where T : class
     {
         var enumerable = targetList.ToList();
         foreach (var target in enumerable)
@@ -83,7 +87,7 @@ public class MeowDatabase
             }
         }
 
-        var insert = Repository.Insert<T>(enumerable, collectionName);
+        var insert = (int)FreeSql.Insert<T>().AppendData(enumerable).ExecuteAffrows();
         Logger.Debug("Insert Count: {InsertCount}", insert);
         return insert;
     }
@@ -95,25 +99,26 @@ public class MeowDatabase
     /// <param name="target">需要更新的对象。</param>
     /// <param name="collectionName">目标数据库集合的名称。</param>
     /// <returns>如果操作成功返回true。</returns>
-    public bool Update<T>(T target, string collectionName)
+    public bool Update<T>(T target, string collectionName) where T : class
     {
         if (target is DatabaseRecordBase record)
         {
             record.RefreshUpdateTime();
         }
 
-        var update = Repository.Update(target, collectionName);
-        Logger.Debug("Update result {UpdateResult}", update);
-        return update;
+        var update = FreeSql.Update<T>().SetSource(target).ExecuteAffrows();
+        Logger.Debug("Update result {UpdateResult}", update > 0);
+        return update > 0;
     }
 
     /// <summary>
     /// 更新数据库集合中的一系列对象，返回更新对象的数量。
     /// </summary>
     /// <typeparam name="T">需要更新的对象类型。</typeparam>
+    /// <param name="targetList">目标对象集合</param>
     /// <param name="collectionName">目标数据库集合的名称。</param>
     /// <returns>返回更新对象的数量。</returns>
-    public int Update<T>(IEnumerable<T> targetList, string collectionName)
+    public int Update<T>(IEnumerable<T> targetList, string collectionName) where T : class
     {
         var enumerable = targetList.ToList();
         var updateCount = 0;
@@ -123,12 +128,9 @@ public class MeowDatabase
             { 
                 record.RefreshUpdateTime();
             }
-
-            if (Repository.Update(target, collectionName))
-            {
-                updateCount++;
-            }
         }
+
+        updateCount = (int)FreeSql.Update<T>().SetSource(enumerable).ExecuteAffrows();
         
         Logger.Debug("Update Count {UpdateCount}", updateCount);
         return updateCount;
@@ -140,20 +142,9 @@ public class MeowDatabase
     /// <typeparam name="T">查询对象的类型。</typeparam>
     /// <param name="collectionName">目标数据库集合的名称。</param>
     /// <returns>查询结果。</returns>
-    public ILiteQueryable<T> Query<T>(string collectionName)
+    public ISelect<T> Query<T>(string collectionName) where T : class
     {
-        return Repository.Query<T>(collectionName);
-    }
-
-    /// <summary>
-    /// 获取指定名称的数据库集合。
-    /// </summary>
-    /// <typeparam name="T">集合中的元素类型。</typeparam>
-    /// <param name="collectionName">数据库集合的名称。</param>
-    /// <returns>指定名称的数据库集合。</returns>
-    public ILiteCollection<T> GetCollection<T>(string collectionName)
-    {
-        return Repository.Database.GetCollection<T>(collectionName);
+        return FreeSql.Select<T>();
     }
 
     #endregion

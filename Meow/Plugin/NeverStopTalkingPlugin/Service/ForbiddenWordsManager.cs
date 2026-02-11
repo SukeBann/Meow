@@ -32,6 +32,7 @@ public class ForbiddenWordsManager : HostDatabaseSupport
     {
         var forbiddenWordRecords = Query<ForbiddenWordRecord>(CollStr.NstForbiddenWordsManagerCollection)
             .Where(x => !x.HasDelete)
+            .ToList()
             .Select(x => x.ForbiddenWord).ToList();
         foreach (var forbiddenWordRecord in forbiddenWordRecords)
         {
@@ -60,7 +61,7 @@ public class ForbiddenWordsManager : HostDatabaseSupport
     {
         var record = Query<ForbiddenWordRecord>(CollStr.NstForbiddenWordsManagerCollection)
             .Where(x => x.ForbiddenWord == word)
-            .FirstOrDefault();
+            .First();
 
         if (record != null)
         {
@@ -90,7 +91,7 @@ public class ForbiddenWordsManager : HostDatabaseSupport
     {
         var record = Query<ForbiddenWordRecord>(CollStr.NstForbiddenWordsManagerCollection)
             .Where(x => x.ForbiddenWord == word)
-            .FirstOrDefault();
+            .First();
 
         if (record == null)
         {

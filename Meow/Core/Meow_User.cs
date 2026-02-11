@@ -106,11 +106,11 @@ public partial class Meow
         if (Database.Query<UserInfo>(MeowUserInfoCollection)
                 .Where(x => !x.HasDelete)
                 .Where(x => x.Uin == uin)
-                .FirstOrDefault() is null)
+                .First() is null)
         {
             Database.Insert(userInfo, MeowUserInfoCollection);
         }
-        UserInfoDict.Add(user.Uin, user);
+        UserInfoDict.Add(userInfo.Uin, userInfo);
         
         Info($"创建新用户:{uin}, 权限等级：{UserPermission.User}");
         return userInfo;

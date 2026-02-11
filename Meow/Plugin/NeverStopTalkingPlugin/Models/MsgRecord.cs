@@ -11,6 +11,8 @@ namespace Meow.Plugin.NeverStopTalkingPlugin.Models;
 /// </summary>
 public class MsgRecord: DatabaseRecordBase
 {
+    public MsgRecord() { }
+
     public MsgRecord(string textMsg, uint sender, uint groupId = 0)
     {
         TextMsg = textMsg;

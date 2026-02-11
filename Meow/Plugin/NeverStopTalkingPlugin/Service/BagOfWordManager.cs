@@ -1,8 +1,8 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
 using System.Reactive.Subjects;
+using FreeSql;
 using Lagrange.Core.Message;
-using LiteDB;
 using Masuit.Tools;
 using Masuit.Tools.Security;
 using Meow.Core.Model.Base;
@@ -19,31 +19,8 @@ public class BagOfWordManager : HostDatabaseSupport
     public BagOfWordManager(Core.Meow host, TextCutter cutter) : base(host)
     {
         TextCutter = cutter;
-
-        VectorCollection.EnsureIndex(x => x.MsgMd5);
-        VectorCollection.EnsureIndex(x => x.Uin);
-        VectorCollection.EnsureIndex(x => x.BagOfWordType);
-
-        BowCollection.EnsureIndex(x => x.Uin);
-        BowCollection.EnsureIndex(x => x.IsFull);
-        BowCollection.EnsureIndex(x => x.DbId);
-        BowCollection.EnsureIndex(x => x.HasDelete);
-        BowCollection.EnsureIndex(x => x.BagOfWordType);
-
         GetFillBagOfWordId();
     }
-
-    /// <summary>
-    /// 向量集合
-    /// </summary>
-    private ILiteCollection<BagOfWordVector> VectorCollection =>
-        GetCollection<BagOfWordVector>(CollStr.NstBagOfWordVectorCollection);
-
-    /// <summary>
-    /// 词袋集合
-    /// </summary>
-    private ILiteCollection<BagOfWordRecord> BowCollection =>
-        GetCollection<BagOfWordRecord>(CollStr.NstBagOfWordManagerCollection);
 
     private TextCutter TextCutter { get; }
 
@@ -81,8 +58,9 @@ public class BagOfWordManager : HostDatabaseSupport
     /// </summary>
     private void GetFillBagOfWordId()
     {
-        var fullBagOfWordDbId = BowCollection
-            .Find(x => x.IsFull && !x.HasDelete)
+        var fullBagOfWordDbId = Query<BagOfWordRecord>(CollStr.NstBagOfWordManagerCollection)
+            .Where(x => x.IsFull && !x.HasDelete)
+            .ToList(x => new { x.BagOfWordType, x.Uin })
             .Select(x => (x.BagOfWordType, x.Uin)).ToArray();
 
         FullWordBagInfo.AddRangeIfNotContains(fullBagOfWordDbId);
@@ -100,9 +78,10 @@ public class BagOfWordManager : HostDatabaseSupport
     private bool QueryBagOfWordRecord([MaybeNullWhen(false)] out BagOfWordRecord wordRecord, BagOfWordType type,
         uint uin, bool isFull = false, bool hasDelete = false)
     {
-        wordRecord = BowCollection
-            .FindOne(x => x.BagOfWordType == type && x.Uin == uin
-                                                  && x.IsFull == isFull && x.HasDelete == hasDelete);
+        wordRecord = Query<BagOfWordRecord>(CollStr.NstBagOfWordManagerCollection)
+            .Where(x => x.BagOfWordType == type && x.Uin == uin
+                                                  && x.IsFull == isFull && x.HasDelete == hasDelete)
+            .First();
         return wordRecord is not null;
     }
 
@@ -130,7 +109,7 @@ public class BagOfWordManager : HostDatabaseSupport
                 .Where(x => x.Uin == 0);
         }
 
-        if (queryable.FirstOrDefault() != null)
+        if (queryable.First() != null)
         {
             message = $"[词袋已经存在, 无法创建] uin: {uin}, 词袋类型:{bagOfWordType}";
             Host.Error(message);
@@ -142,6 +121,7 @@ public class BagOfWordManager : HostDatabaseSupport
                 : PersonalBowMaxCount,
             bagOfWordType is BagOfWordType.Global ? 0 : uin,
             bagOfWordType);
+        bagOfWordRecord.RefreshIsFull();
 
         Insert(bagOfWordRecord, CollStr.NstBagOfWordManagerCollection);
         return true;
@@ -155,7 +135,9 @@ public class BagOfWordManager : HostDatabaseSupport
     /// <returns>返回查询结果，包括消息数量和构建词袋大小。如果没找到目标词袋，则返回提示信息。</returns>
     public Task<string> QueryMsgCutBagOfWordCount(BagOfWordType bagOfWordType, uint uin)
     {
-        var bagOfWordRecord = BowCollection.FindOne(x => x.BagOfWordType == bagOfWordType && x.Uin == uin);
+        var bagOfWordRecord = Query<BagOfWordRecord>(CollStr.NstBagOfWordManagerCollection)
+            .Where(x => x.BagOfWordType == bagOfWordType && x.Uin == uin)
+            .First();
         if (bagOfWordRecord is null)
         {
             return Task.FromResult($"为查询到目标词袋 [Type:{bagOfWordType}-Uin:{uin}]");
@@ -198,7 +180,10 @@ public class BagOfWordManager : HostDatabaseSupport
     private IEnumerable<MsgRecord> GetBowAllMsgRecords(Expression<Func<MsgRecord, bool>> recordFilter,
         int limit = int.MaxValue)
     {
-        return GetCollection<MsgRecord>(CollStr.NstMessageProcessMsgRecordCollection).Find(recordFilter, limit: limit);
+        return Query<MsgRecord>(CollStr.NstMessageProcessMsgRecordCollection)
+            .Where(recordFilter)
+            .Limit(limit)
+            .ToList();
     }
 
     /// <summary>
@@ -210,7 +195,9 @@ public class BagOfWordManager : HostDatabaseSupport
     public Task<string> RebuildBagOfWord(BagOfWordType type, uint target)
     {
         // 查找匹配类型和目标的词袋记录
-        var bow = BowCollection.FindOne(x => x.BagOfWordType == type && x.Uin == target);
+        var bow = Query<BagOfWordRecord>(CollStr.NstBagOfWordManagerCollection)
+            .Where(x => x.BagOfWordType == type && x.Uin == target)
+            .First();
         if (bow is null)
         {
             // 如果没有找到对应的词袋记录，返回提示信息
@@ -263,6 +250,7 @@ public class BagOfWordManager : HostDatabaseSupport
         {
             bow.MaxCount = bow.BagOfWord.Count;
         }
+        bow.RefreshIsFull();
 
         Update(bow, CollStr.NstBagOfWordManagerCollection);
 
@@ -318,14 +306,17 @@ public class BagOfWordManager : HostDatabaseSupport
     {
         result = "查询词袋失败!";
 
-        var bagOfWordRecord = BowCollection
-            .FindOne(x => x.BagOfWordType == bagOfWordType && x.Uin == uin);
+        var bagOfWordRecord = Query<BagOfWordRecord>(CollStr.NstBagOfWordManagerCollection)
+            .Where(x => x.BagOfWordType == bagOfWordType && x.Uin == uin)
+            .First();
         if (bagOfWordRecord is null)
         {
             return;
         }
 
-        var vectorCount = VectorCollection.Count(x => x.Uin == uin && x.BagOfWordType == bagOfWordType);
+        var vectorCount = Query<BagOfWordVector>(CollStr.NstBagOfWordVectorCollection)
+            .Where(x => x.Uin == uin && x.BagOfWordType == bagOfWordType)
+            .Count();
 
         result =
             $"""
@@ -358,7 +349,7 @@ public class BagOfWordManager : HostDatabaseSupport
         var bagOfWordRecord = Query<BagOfWordRecord>(CollStr.NstBagOfWordManagerCollection)
             .Where(x => x.BagOfWordType == bagOfWordType)
             .Where(x => x.Uin == uin)
-            .FirstOrDefault();
+            .First();
         if (bagOfWordRecord == null)
         {
             return false;
@@ -379,7 +370,7 @@ public class BagOfWordManager : HostDatabaseSupport
     /// <param name="bagOfWordId"></param>
     private void DeleteAllBoWVector(int bagOfWordId)
     {
-        var deleteCount = VectorCollection.DeleteMany(x => x.BagOfWordId == bagOfWordId);
+        var deleteCount = Database.FreeSql.Delete<BagOfWordVector>().Where(x => x.BagOfWordId == bagOfWordId).ExecuteAffrows();
         Host.Info($"词袋:{bagOfWordId}, 总计删除{deleteCount}条词袋向量");
     }
 
@@ -429,8 +420,9 @@ public class BagOfWordManager : HostDatabaseSupport
         if (msgRecord.IsGroupMsg && validGroupIds.Contains(msgRecord.GroupId) &&
             FullWordBagInfo.Contains((BagOfWordType.Global, 0)))
         {
-            var exist = GetCollection<BagOfWordVector>(CollStr.NstBagOfWordVectorCollection)
-                .FindOne(x => x.BagOfWordType == BagOfWordType.Global && x.Uin == 0 && x.MsgMd5 == messageMd5);
+            var exist = Query<BagOfWordVector>(CollStr.NstBagOfWordVectorCollection)
+                .Where(x => x.BagOfWordType == BagOfWordType.Global && x.Uin == 0 && x.MsgMd5 == messageMd5)
+                .First();
             if (exist is not null)
             {
                 msgRecord.HaveVector = true;
@@ -483,8 +475,9 @@ public class BagOfWordManager : HostDatabaseSupport
         }
 
         // 被计算过就不在计算
-        var exist = GetCollection<BagOfWordVector>(CollStr.NstBagOfWordVectorCollection)
-            .FindOne(x => x.BagOfWordType == type && x.Uin == bowUin && x.MsgMd5 == md5);
+        var exist = Query<BagOfWordVector>(CollStr.NstBagOfWordVectorCollection)
+            .Where(x => x.BagOfWordType == type && x.Uin == bowUin && x.MsgMd5 == md5)
+            .First();
         if (exist is not null)
         {
             msgRecord.HaveVector = true;
@@ -618,6 +611,7 @@ public class BagOfWordManager : HostDatabaseSupport
             return;
         }
 
+        bagOfWordRecord.RefreshIsFull();
         changeList.Add(bagOfWordRecord);
         if (bagOfWordRecord.IsFull)
         {
@@ -647,8 +641,9 @@ public class BagOfWordManager : HostDatabaseSupport
         do
         {
             var skip = (currentPage - 1) * pageSize;
-            page = VectorCollection.Find(x => x.BagOfWordId == bagOfWordId)
-                .Skip(skip).Take(pageSize).ToList();
+            page = Query<BagOfWordVector>(CollStr.NstBagOfWordVectorCollection)
+                .Where(x => x.BagOfWordId == bagOfWordId)
+                .Skip(skip).Limit(pageSize).ToList();
             if (page.Count == 0)
             {
                 continue;

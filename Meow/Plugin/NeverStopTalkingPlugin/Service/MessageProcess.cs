@@ -34,11 +34,6 @@ public class MessageProcess : HostDatabaseSupport
         BagOfWordManager.BoWBusyStateChange.Subscribe(isBusy => IsBowManagerBusy = isBusy);
         TextCutter = textCutter;
 
-        var msgCollection = GetCollection<MsgRecord>(CollStr.NstMessageProcessMsgRecordCollection);
-        msgCollection.EnsureIndex(x => x.DbId);
-        msgCollection.EnsureIndex(x => x.HaveVector);
-        msgCollection.EnsureIndex(x => x.HasDelete);
-
         Task.Run(ProcessMessageVector);
         StartProcessTask();
     }
@@ -189,8 +184,8 @@ public class MessageProcess : HostDatabaseSupport
         // 多条随机取一条
         var index = new Random().Next(0, count - 1);
         var (similarity, msgId) = waitingList[index];
-        var firstMsg = GetCollection<MsgRecord>(CollStr.NstMessageProcessMsgRecordCollection)
-            .FindOne(x => x.DbId == msgId);
+        var firstMsg = Query<MsgRecord>(CollStr.NstMessageProcessMsgRecordCollection)
+            .Where(x => x.DbId == msgId).First();
         if (firstMsg is null)
         {
             nstTriggerRecord.TriggerFailedCount++;
@@ -315,8 +310,8 @@ public class MessageProcess : HostDatabaseSupport
     /// </summary>
     private void ProcessMessageVector()
     {
-        foreach (var msgRecord in GetCollection<MsgRecord>(CollStr.NstMessageProcessMsgRecordCollection)
-                     .Find(x => !x.HasDelete && !x.HaveVector))
+        foreach (var msgRecord in Query<MsgRecord>(CollStr.NstMessageProcessMsgRecordCollection)
+                     .Where(x => !x.HasDelete && !x.HaveVector).ToList())
         {
             if (TextCutter.CutPlainText(msgRecord.TextMsg, out var filterResult))
             {

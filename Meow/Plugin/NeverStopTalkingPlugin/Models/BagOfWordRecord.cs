@@ -1,6 +1,6 @@
 ﻿using System.Collections.Concurrent;
+using FreeSql.DataAnnotations;
 using Meow.Core.Model.Base;
-using Microsoft.EntityFrameworkCore.Metadata.Internal;
 
 namespace Meow.Plugin.NeverStopTalkingPlugin.Models;
 
@@ -9,6 +9,8 @@ namespace Meow.Plugin.NeverStopTalkingPlugin.Models;
 /// </summary>
 public class BagOfWordRecord : DatabaseRecordBase
 {
+    public BagOfWordRecord() { }
+
     /// <summary>
     /// 创建词袋
     /// </summary>
@@ -28,6 +30,7 @@ public class BagOfWordRecord : DatabaseRecordBase
     /// <br/> key: 词
     /// <br/> value: 索引
     /// </summary>
+    [Column(StringLength = -1)]
     public Dictionary<string, int> BagOfWord { get; set; } = new();
 
     /// <summary>
@@ -46,6 +49,7 @@ public class BagOfWordRecord : DatabaseRecordBase
         foreach (var word in words)
         {
             // 被装满了就直接return
+            RefreshIsFull();
             if (IsFull)
             {
                 return addCount;
@@ -63,6 +67,7 @@ public class BagOfWordRecord : DatabaseRecordBase
             }
         }
 
+        RefreshIsFull();
         return addCount;
     }
 
@@ -74,7 +79,13 @@ public class BagOfWordRecord : DatabaseRecordBase
     /// <summary>
     /// 是否已经装满
     /// </summary>
-    public bool IsFull => BagOfWord.Count == MaxCount;
+    [Column(IsIgnore = false)]
+    public bool IsFull { get; set; }
+
+    /// <summary>
+    /// 更新是否装满状态
+    /// </summary>
+    public void RefreshIsFull() => IsFull = BagOfWord.Count >= MaxCount;
 
     /// <summary>
     /// 群id | qq | global:0
@@ -84,5 +95,5 @@ public class BagOfWordRecord : DatabaseRecordBase
     /// <summary>
     /// 词袋类型
     /// </summary>
-    public BagOfWordType BagOfWordType { get; private set; }
+    public BagOfWordType BagOfWordType { get; set; }
 }
