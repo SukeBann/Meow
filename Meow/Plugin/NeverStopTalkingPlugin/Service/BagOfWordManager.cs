@@ -1,8 +1,8 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
 using System.Reactive.Subjects;
-using FreeSql;
-using Lagrange.Core.Message;
+using Camille.Core.MiraiBase.Contract;
+using Camille.Imp.MiraiBase.Message.MessageContainer;
 using Masuit.Tools;
 using Masuit.Tools.Security;
 using Meow.Core.Model.Base;
@@ -16,7 +16,7 @@ namespace Meow.Plugin.NeverStopTalkingPlugin.Service;
 public class BagOfWordManager : HostDatabaseSupport
 {
     /// <inheritdoc />
-    public BagOfWordManager(Core.Meow host, TextCutter cutter) : base(host)
+    public BagOfWordManager(Core.Meow bot, TextCutter cutter) : base(bot)
     {
         TextCutter = cutter;
         GetFillBagOfWordId();
@@ -47,7 +47,7 @@ public class BagOfWordManager : HostDatabaseSupport
     /// <br/> 词袋类型
     /// <br/> 词袋uin
     /// </summary>
-    private HashSet<(BagOfWordType type, uint uin)> FullWordBagInfo { get; } = [];
+    private HashSet<(BagOfWordType type, long uin)> FullWordBagInfo { get; } = [];
 
     #endregion
 
@@ -60,8 +60,8 @@ public class BagOfWordManager : HostDatabaseSupport
     {
         var fullBagOfWordDbId = Query<BagOfWordRecord>(CollStr.NstBagOfWordManagerCollection)
             .Where(x => x.IsFull && !x.HasDelete)
-            .ToList(x => new { x.BagOfWordType, x.Uin })
-            .Select(x => (x.BagOfWordType, x.Uin)).ToArray();
+            .ToList(x => new {x.BagOfWordType, x.Uin})
+            .Select(x => (x.BagOfWordType, (long) x.Uin)).ToArray();
 
         FullWordBagInfo.AddRangeIfNotContains(fullBagOfWordDbId);
     }
@@ -76,11 +76,11 @@ public class BagOfWordManager : HostDatabaseSupport
     /// <param name="hasDelete">词袋是否已被删除的标志，默认为 false。</param>
     /// <returns>如果找到符合条件的记录，则返回 true；否则返回 false。</returns>
     private bool QueryBagOfWordRecord([MaybeNullWhen(false)] out BagOfWordRecord wordRecord, BagOfWordType type,
-        uint uin, bool isFull = false, bool hasDelete = false)
+        long uin, bool isFull = false, bool hasDelete = false)
     {
         wordRecord = Query<BagOfWordRecord>(CollStr.NstBagOfWordManagerCollection)
             .Where(x => x.BagOfWordType == type && x.Uin == uin
-                                                  && x.IsFull == isFull && x.HasDelete == hasDelete)
+                                                && x.IsFull == isFull && x.HasDelete == hasDelete)
             .First();
         return wordRecord is not null;
     }
@@ -88,19 +88,19 @@ public class BagOfWordManager : HostDatabaseSupport
     /// <summary>
     /// 创建新词袋
     /// </summary>
-    /// <param name="uin">群号或者qq</param>
+    /// <param name="target">群号或者qq</param>
     /// <param name="bagOfWordType">词袋类型</param>
     /// <returns>
     /// <br/> true: 成功创建
     /// <br/> false: 创建失败 <see cref="message"/>会提示错误信息
     /// </returns>
-    public bool CreateBagOfWord(uint uin, BagOfWordType bagOfWordType, out string message)
+    public bool CreateBagOfWord(long target, BagOfWordType bagOfWordType, out string message)
     {
         message = string.Empty;
 
         var queryable = Query<BagOfWordRecord>(CollStr.NstBagOfWordManagerCollection)
             .Where(x => x.BagOfWordType == bagOfWordType)
-            .Where(x => x.Uin == uin);
+            .Where(x => x.Uin == target);
         // 全局词袋只能有一个 并且uin为0
         if (bagOfWordType is BagOfWordType.Global)
         {
@@ -111,15 +111,15 @@ public class BagOfWordManager : HostDatabaseSupport
 
         if (queryable.First() != null)
         {
-            message = $"[词袋已经存在, 无法创建] uin: {uin}, 词袋类型:{bagOfWordType}";
-            Host.Error(message);
+            message = $"[词袋已经存在, 无法创建] uin: {target}, 词袋类型:{bagOfWordType}";
+            Bot.Error(message);
             return false;
         }
 
         var bagOfWordRecord = new BagOfWordRecord(bagOfWordType is BagOfWordType.Global or BagOfWordType.Group
                 ? GroupBowMaxCount
                 : PersonalBowMaxCount,
-            bagOfWordType is BagOfWordType.Global ? 0 : uin,
+            bagOfWordType is BagOfWordType.Global ? 0 : target,
             bagOfWordType);
         bagOfWordRecord.RefreshIsFull();
 
@@ -131,16 +131,16 @@ public class BagOfWordManager : HostDatabaseSupport
     /// 查询指定类型的词袋中可以构建的词袋大小。
     /// </summary>
     /// <param name="bagOfWordType">词袋类型，分为群组、个人和全局。</param>
-    /// <param name="uin">目标ID，通常为群组ID或用户ID。</param>
+    /// <param name="target">目标ID，通常为群组ID或用户ID。</param>
     /// <returns>返回查询结果，包括消息数量和构建词袋大小。如果没找到目标词袋，则返回提示信息。</returns>
-    public Task<string> QueryMsgCutBagOfWordCount(BagOfWordType bagOfWordType, uint uin)
+    public Task<string> QueryMsgCutBagOfWordCount(BagOfWordType bagOfWordType, long target)
     {
         var bagOfWordRecord = Query<BagOfWordRecord>(CollStr.NstBagOfWordManagerCollection)
-            .Where(x => x.BagOfWordType == bagOfWordType && x.Uin == uin)
+            .Where(x => x.BagOfWordType == bagOfWordType && x.Uin == target)
             .First();
         if (bagOfWordRecord is null)
         {
-            return Task.FromResult($"为查询到目标词袋 [Type:{bagOfWordType}-Uin:{uin}]");
+            return Task.FromResult($"为查询到目标词袋 [Type:{bagOfWordType}-Uin:{target}]");
         }
 
         const int maxCount = 20000;
@@ -149,10 +149,10 @@ public class BagOfWordManager : HostDatabaseSupport
         switch (bagOfWordType)
         {
             case BagOfWordType.Group:
-                records = GetBowAllMsgRecords(x => x.IsGroupMsg && x.GroupId == uin && !x.HasDelete, maxCount);
+                records = GetBowAllMsgRecords(x => x.GroupId != 0 && x.GroupId == target && !x.HasDelete, maxCount);
                 break;
             case BagOfWordType.Personal:
-                records = GetBowAllMsgRecords(x => x.Sender == uin && !x.HasDelete, maxCount);
+                records = GetBowAllMsgRecords(x => x.Sender == target && !x.HasDelete, maxCount);
                 break;
             case BagOfWordType.Global:
                 records = GetBowAllMsgRecords(x => !x.HasDelete, maxCount);
@@ -192,7 +192,7 @@ public class BagOfWordManager : HostDatabaseSupport
     /// <param name="type"></param>
     /// <param name="target"></param>
     /// <exception cref="NotImplementedException"></exception>
-    public Task<string> RebuildBagOfWord(BagOfWordType type, uint target)
+    public Task<string> RebuildBagOfWord(BagOfWordType type, long target)
     {
         // 查找匹配类型和目标的词袋记录
         var bow = Query<BagOfWordRecord>(CollStr.NstBagOfWordManagerCollection)
@@ -211,7 +211,7 @@ public class BagOfWordManager : HostDatabaseSupport
         switch (type)
         {
             case BagOfWordType.Group:
-                records = GetBowAllMsgRecords(x => x.IsGroupMsg && x.GroupId == target && !x.HasDelete, maxCount);
+                records = GetBowAllMsgRecords(x => x.GroupId != 0 && x.GroupId == target && !x.HasDelete, maxCount);
                 break;
             case BagOfWordType.Personal:
                 records = GetBowAllMsgRecords(x => x.Sender == target && !x.HasDelete, maxCount);
@@ -250,6 +250,7 @@ public class BagOfWordManager : HostDatabaseSupport
         {
             bow.MaxCount = bow.BagOfWord.Count;
         }
+
         bow.RefreshIsFull();
 
         Update(bow, CollStr.NstBagOfWordManagerCollection);
@@ -284,30 +285,32 @@ public class BagOfWordManager : HostDatabaseSupport
             count++;
         }
 
+        FullWordBagInfo.Add((BagOfWordType.Group, bow.Uin));
+
         // 生成输出信息，包括目标类型、目标ID、词袋构建状态和重新计算的消息向量数量
         var output = $"[{type}-{bow.Uin}]\nBoWState:{bow.BagOfWord.Count}/{bow.MaxCount}\nCalculateMsgCount: {count}";
-        Host.Info(output);
+        Bot.Info(output);
         return Task.FromResult(output);
     }
 
     /// <summary>
     /// 查询词袋
     /// </summary>
-    /// <param name="uin">群号或者qq</param>
+    /// <param name="target">群号或者qq</param>
     /// <param name="bagOfWordType">词袋类型</param>
     /// <param name="result">查询结果文本</param>
     /// <returns>
     /// <br/> true: 查询成功
     /// <br/> false: 查询失败
     /// </returns>
-    public void QueryBagOfWordCommand(uint uin,
+    public void QueryBagOfWordCommand(long target,
         BagOfWordType bagOfWordType,
         out string result)
     {
         result = "查询词袋失败!";
 
         var bagOfWordRecord = Query<BagOfWordRecord>(CollStr.NstBagOfWordManagerCollection)
-            .Where(x => x.BagOfWordType == bagOfWordType && x.Uin == uin)
+            .Where(x => x.BagOfWordType == bagOfWordType && x.Uin == target)
             .First();
         if (bagOfWordRecord is null)
         {
@@ -315,7 +318,7 @@ public class BagOfWordManager : HostDatabaseSupport
         }
 
         var vectorCount = Query<BagOfWordVector>(CollStr.NstBagOfWordVectorCollection)
-            .Where(x => x.Uin == uin && x.BagOfWordType == bagOfWordType)
+            .Where(x => x.Uin == target && x.BagOfWordType == bagOfWordType)
             .Count();
 
         result =
@@ -333,13 +336,13 @@ public class BagOfWordManager : HostDatabaseSupport
     /// <summary>
     /// 删除词袋
     /// </summary>
-    /// <param name="uin">群号或者qq</param>
+    /// <param name="target">群号或者qq</param>
     /// <param name="bagOfWordType">词袋类型</param>
     /// <returns>
     /// <br/> true: 成功删除
     /// <br/> false: 删除失败
     /// </returns>
-    public bool RemoveBagOfWord(uint uin, BagOfWordType bagOfWordType)
+    public bool RemoveBagOfWord(long target, BagOfWordType bagOfWordType)
     {
         if (bagOfWordType is BagOfWordType.Global)
         {
@@ -348,7 +351,7 @@ public class BagOfWordManager : HostDatabaseSupport
 
         var bagOfWordRecord = Query<BagOfWordRecord>(CollStr.NstBagOfWordManagerCollection)
             .Where(x => x.BagOfWordType == bagOfWordType)
-            .Where(x => x.Uin == uin)
+            .Where(x => x.Uin == target)
             .First();
         if (bagOfWordRecord == null)
         {
@@ -368,28 +371,39 @@ public class BagOfWordManager : HostDatabaseSupport
     /// 删除目标词袋的所有词向量
     /// </summary>
     /// <param name="bagOfWordId"></param>
-    private void DeleteAllBoWVector(int bagOfWordId)
+    private void DeleteAllBoWVector(long bagOfWordId)
     {
-        var deleteCount = Database.FreeSql.Delete<BagOfWordVector>().Where(x => x.BagOfWordId == bagOfWordId).ExecuteAffrows();
-        Host.Info($"词袋:{bagOfWordId}, 总计删除{deleteCount}条词袋向量");
+        var deleteCount = Database.FreeSql.Delete<BagOfWordVector>().Where(x => x.BagOfWordId == bagOfWordId)
+            .ExecuteAffrows();
+        Bot.Info($"词袋:{bagOfWordId}, 总计删除{deleteCount}条词袋向量");
     }
 
     /// <summary>
     /// 处理分词结果, 将分词结果尝试填充到词袋中, 如果词袋已经充满 则根据词袋计算消息向量
     /// </summary>
-    /// <param name="messageChain">源消息链</param>
+    /// <param name="container">源消息容器</param>
     /// <param name="textMessage">消息链中的纯文本数据</param>
     /// <param name="filterResult">分词后经过过滤的结果</param>
     /// <returns>包含了消息是否经过向量计算, 向量计算数据的处理结果</returns>
-    public MsgRecord ProcessCutResult(MessageChain messageChain,
+    public MsgRecord ProcessCutResult(IMiraiMessageContainer container,
         string textMessage,
         string[] filterResult)
     {
-        uint groupId = 0;
-        var senderId = messageChain.FriendUin;
-        if (messageChain.Type is MessageChain.MessageType.Group)
+        long groupId = 0;
+        long senderId = 0;
+
+        if (container is FriendMiraiMsgContainer friendContainer)
         {
-            groupId = messageChain.GroupUin ?? throw new Exception("处理消息失败, 消息链是群消息类型 但却没有包含群id");
+            senderId = friendContainer.Sender.Id;
+        }
+        else if (container is GroupMiraiMsgContainer groupContainer)
+        {
+            senderId = groupContainer.Sender.Id;
+            groupId = groupContainer.Sender.Group.Id;
+        }
+        else if (container is TempMiraiMsgContainer tempContainer)
+        {
+            senderId = tempContainer.Sender.Id;
         }
 
         var msgRecord = new MsgRecord(textMessage, senderId, groupId);
@@ -416,7 +430,7 @@ public class BagOfWordManager : HostDatabaseSupport
 
         // 从全局词袋获取向量
         // 全局词袋只收集这两个群, 并且全局词袋要是满的才收集
-        var validGroupIds = new uint[] {726070631, 587914615};
+        var validGroupIds = new long[] {726070631, 587914615};
         if (msgRecord.IsGroupMsg && validGroupIds.Contains(msgRecord.GroupId) &&
             FullWordBagInfo.Contains((BagOfWordType.Global, 0)))
         {
@@ -465,7 +479,7 @@ public class BagOfWordManager : HostDatabaseSupport
     /// <param name="result">被添加进词袋的词向量集合</param>
     /// <param name="msgRecord">消息记录</param>
     /// <param name="filterResult">分词结果</param>
-    void AddBagOfWordVector(BagOfWordType type, int msgId, uint bowUin, string md5, List<BagOfWordVector> result,
+    void AddBagOfWordVector(BagOfWordType type, long msgId, long bowUin, string md5, List<BagOfWordVector> result,
         MsgRecord msgRecord, string[] filterResult)
     {
         // 所需的词袋没有装满就退出
@@ -560,11 +574,11 @@ public class BagOfWordManager : HostDatabaseSupport
     /// <param name="words">需要添加到词袋中的词列表。</param>
     /// <param name="senderId">发送人Id 如果存在个人词袋则会尝试添加到个人词袋</param>
     /// <param name="groupId">可选的群组ID，如果存在则尝试添加到群词袋</param>
-    private void TryFillBagWord(string[] words, uint senderId, uint groupId)
+    private void TryFillBagWord(string[] words, long senderId, long groupId)
     {
-        const uint GlobalGroup1 = 726070631;
-        const uint GlobalGroup2 = 587914615;
-        var validGlobalGroups = new[] {GlobalGroup1, GlobalGroup2};
+        const long GlobalGroup1 = 726070631;
+        const long GlobalGroup2 = 587914615;
+        var validGlobalGroups = new long[] {GlobalGroup1, GlobalGroup2};
 
         var changeList = new List<BagOfWordRecord>();
 
@@ -580,7 +594,7 @@ public class BagOfWordManager : HostDatabaseSupport
 
         if (changeList.Count > 0)
         {
-            Host.Info(
+            Bot.Info(
                 $"需要更新的词袋：{string.Join(", ", changeList.Select(x => $"[{x.BagOfWordType} {x.Uin} {x.BagOfWord.Count}]"))}");
             UpdateCollection(changeList, CollStr.NstBagOfWordManagerCollection);
         }
@@ -593,7 +607,7 @@ public class BagOfWordManager : HostDatabaseSupport
     /// <param name="bagOfWordType">词袋的类型。</param>
     /// <param name="uin">词袋对应的唯一标识符。</param>
     /// <param name="changeList">用于记录已更改的词袋记录的列表。</param>
-    private void AddWordsToBag(string[] words, BagOfWordType bagOfWordType, uint uin, List<BagOfWordRecord> changeList)
+    private void AddWordsToBag(string[] words, BagOfWordType bagOfWordType, long uin, List<BagOfWordRecord> changeList)
     {
         // 词袋装满就直接返回
         if (FullWordBagInfo.Contains((bagOfWordType, uin)))
@@ -631,13 +645,13 @@ public class BagOfWordManager : HostDatabaseSupport
     /// 该方法分页查询指定词袋 ID 的消息向量，每页返回指定数量的消息向量，并通过委托方法进行相似度计算。
     /// 委托方法 `pageData` 应该接受一个包含消息向量的列表，并返回一个包含相似度和消息 ID 的元组列表。
     /// </remarks>
-    public List<(double similarity, int msgId)> PaginationQueryCalculation(int bagOfWordId,
-        Func<List<BagOfWordVector>, List<(double similarity, int msgId)>> pageData)
+    public List<(double similarity, long msgId)> PaginationQueryCalculation(long bagOfWordId,
+        Func<List<BagOfWordVector>, List<(double similarity, long msgId)>> pageData)
     {
         var currentPage = 1; // 当前页码
         const int pageSize = 5000; // 每页的数据量
         List<BagOfWordVector>? page = null;
-        var result = new List<(double, int)>();
+        var result = new List<(double, long)>();
         do
         {
             var skip = (currentPage - 1) * pageSize;

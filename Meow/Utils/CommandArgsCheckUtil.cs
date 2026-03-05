@@ -1,13 +1,14 @@
 ﻿using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
-using Lagrange.Core.Message;
+using Camille.Core.MiraiBase.Models.Base;
 using Masuit.Tools;
 
 namespace Meow.Utils;
 
-        /// <summary>
-        /// 参数检查类
-        /// </summary>
+/// <summary>
+/// 参数检查类
+/// </summary>
 public class CommandArgsCheckUtil
 {
     public CommandArgsCheckUtil(MessageChain sourceMessage, string? args)
@@ -73,12 +74,12 @@ public class CommandArgsCheckUtil
     public bool IsSuccess(out string errorMsg,
         out MessageChain resultMessageChain,
         out string args,
-        out List<string>? splitResult)
+        [MaybeNullWhen(false)]out List<string> splitResult)
     {
         errorMsg = string.Empty;
         resultMessageChain = SourceMessage;
         args = string.Empty;
-        splitResult = default;
+        splitResult = null;
 
         if (NeedSpilt)
         {
@@ -93,7 +94,7 @@ public class CommandArgsCheckUtil
         if (CheckFailed)
         {
             errorMsg = ErrorMsg ?? "未知错误";
-            resultMessageChain = SourceMessage.CreateSameTypeTextMessage(ErrorMsg ?? "未知错误");
+            resultMessageChain = (ErrorMsg ?? "未知错误");
             return false;
         }
 

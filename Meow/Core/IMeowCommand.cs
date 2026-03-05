@@ -1,4 +1,5 @@
-﻿using Lagrange.Core.Message;
+﻿using Camille.Core.MiraiBase.Models.Base;
+using Camille.Imp.MiraiBase.Message;
 
 namespace Meow.Core;
 
@@ -17,7 +18,7 @@ public interface IMeowCommand
     /// <br/>比如help 触发帮助命令
     /// </summary>
     public string CommandTrigger { get; }
-    
+
     /// <summary>
     /// 打印命令简述
     /// </summary>
@@ -37,8 +38,9 @@ public interface IMeowCommand
     /// 执行命令, 并返回用于发送的消息链
     /// </summary>
     /// <param name="meow">在哪个bot上执行</param>
-    /// <param name="messageChain">触发命令的消息链</param>
+    /// <param name="container">触发命令的消息</param>
     /// <param name="args">参数</param>
-    public Task<(bool needSendMessage, MessageChain messageChain)> RunCommand(Meow meow, MessageChain messageChain,
+    public Task<(bool needSendMessage, MessageChain messageChain)> RunCommand(Meow meow,
+        MiraiMsgContainerBase container,
         string? args);
 }

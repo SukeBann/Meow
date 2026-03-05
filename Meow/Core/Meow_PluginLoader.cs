@@ -1,6 +1,6 @@
 ﻿using System.Diagnostics.CodeAnalysis;
-using Lagrange.Core.Message;
-using Lagrange.Core.Message.Entity;
+using Camille.Core.MiraiBase.Models.Base;
+using Camille.Core.MiraiBase.Models.BasicMessage;
 using Masuit.Tools;
 
 namespace Meow.Core;
@@ -47,6 +47,7 @@ public partial class Meow
         {
             throw new Exception($"{plugin.PluginName}: 插件UID不能为空");
         }
+
         if (PluginDict.ContainsKey(plugin.PluginUid))
         {
             throw new Exception($"{plugin.PluginName}:不能重复加载相同UID插件: {plugin.PluginUid}");
@@ -55,7 +56,7 @@ public partial class Meow
         TryLoadCommand(plugin);
         plugin.InjectPlugin(this);
         UpdatePluginPermission(plugin);
-        
+
         PluginDict.Add(plugin.PluginUid, plugin);
         Plugins.Add(plugin);
         var random = new Random().Next(0, 10000);
@@ -73,7 +74,7 @@ public partial class Meow
         {
             return;
         }
-        
+
         if (plugin.Commands.Any(pluginCommand => CommandDict.ContainsKey(pluginCommand.CommandUid)))
         {
             var message = $"插件: {plugin.PluginName}命令加载失败, 无法重复加载相同Uid的命令";
@@ -118,18 +119,18 @@ public partial class Meow
     /// <returns></returns>
     private bool TryParseCommand(MessageChain messageChain,
         [MaybeNullWhen(false)] out string commandTrigger,
-        out string? args)
+        [MaybeNullWhen(false)] out string args)
     {
         commandTrigger = null;
         args = null;
-        var firstMessage = messageChain.FirstOrDefault(x => x is TextEntity);
-        if (firstMessage is not TextEntity textEntity || textEntity.Text.Length < 2 ||
-            !textEntity.Text[0].Equals(CommandPrompt))
+        var firstMessage = messageChain.FirstOrDefault(x => x is Plain);
+        if (firstMessage is not Plain plain || plain.Text.Length < 2 ||
+            !plain.Text[0].Equals(CommandPrompt))
         {
             return false;
         }
 
-        var command = textEntity.Text[1..];
+        var command = plain.Text[1..];
         var strings = command.Split(CommandArgsSeparator, 2);
         switch (strings.Length)
         {

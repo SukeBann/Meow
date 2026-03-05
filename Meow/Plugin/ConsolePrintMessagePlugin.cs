@@ -1,8 +1,10 @@
 ﻿using System.Reactive.Concurrency;
 using System.Reactive.Linq;
 using System.Text.RegularExpressions;
-using Lagrange.Core.Event;
-using Lagrange.Core.Message;
+using Camille.Core.MiraiBase.Contract;
+using Camille.Core.MiraiBase.Models.Base;
+using Camille.Imp.MiraiBase.Message;
+using Camille.Imp.MiraiBase.Message.MessageContainer;
 using Meow.Core;
 using Meow.Core.Model.Base;
 
@@ -44,54 +46,48 @@ public partial class ConsolePrintMessagePlugin : PluginBase
     public override void InjectPlugin(Core.Meow host)
     {
         base.InjectPlugin(host);
-        MessageReceivedDisposable = Host.OnMessageReceived
+        MessageReceivedDisposable = Bot?.OnMiraiMessageReceived
             .ObserveOn(ThreadPoolScheduler.Instance)
             .Subscribe(Handle);
     }
 
-    private static void Handle((Core.Meow meow, MessageChain messageChain, MessageChain.MessageType messageType) @event)
+    private void Handle(IMiraiMessageContainer containerBase)
     {
-        var (meow, messageChain, messageType) = @event;
-
+        var messageChain = containerBase.MessageChain;
         string? output;
-        switch (messageType)
+        switch (containerBase)
         {
-            case MessageChain.MessageType.Group:
-            case MessageChain.MessageType.Temp:
-                var group = meow.BotGroups.FirstOrDefault(x => x.GroupUin == messageChain.GroupUin);
-                var groupName = group?.GroupName ?? group?.GroupUin.ToString() ?? "KnownGroup";
-                var groupMemberName = messageChain?.GroupMemberInfo?.MemberCard ??
-                                  messageChain?.GroupMemberInfo?.MemberName ?? "KnownMember";
-                groupMemberName = groupMemberName.Replace(Environment.NewLine, "").Trim();
-                var msgSymbol = messageType is MessageChain.MessageType.Temp ? "T" : "G";
-                output =
-                    $"{Environment.NewLine}{msgSymbol}[{groupName}]-[{groupMemberName}]{Environment.NewLine}{messageChain?.ToPreviewText()}";
+            case FriendMiraiMsgContainer friendMiraiMsgContainer:
+                output = $"[F]-[{(containerBase as FriendMiraiMsgContainer)?.Sender?.Nickname}] {messageChain.GetPlainMessage()}";
                 break;
-            case MessageChain.MessageType.Friend:
-                var friendName = messageChain?.FriendInfo?.Nickname ??
-                                 messageChain?.FriendInfo?.Uin.ToString() ?? "KnownFriend";
-                output = $"{Environment.NewLine}F[{friendName}]{Environment.NewLine}{messageChain?.ToPreviewText()}";
+            case GroupMiraiMsgContainer groupMiraiMsgContainer:
+            case TempMiraiMsgContainer tempMiraiMsgContainer:
+                var msgSymbol = containerBase is TempMiraiMsgContainer ? "T" : "G";
+                var sender = containerBase is GroupMiraiMsgContainer group ? $"[{group.Sender?.Group.Name}-{group.Sender?.MemberName}]" : (containerBase as TempMiraiMsgContainer)?.Sender?.Nickname;
+                output =
+                $"[{msgSymbol}]-[{sender}] {messageChain.GetPlainMessage()}";
                 break;
             default:
-                throw new ArgumentOutOfRangeException(nameof(messageType), "未知的消息类型, 无法正确解析");
+                output = $"[U] {messageChain.GetPlainMessage()}";
+                break;
         }
 
         // 如果不替换掉的话 在WPF的RichTextBox输出中会报错
         output = MatchEmojiUnicode().Replace(output, string.Empty);
         try
         {
-            meow.Info(output);
+            Bot?.Info(output);
         }
         catch (Exception e)
         {
-            meow.Error("插入日志失败", e);
+            Bot?.Error("插入日志失败", e);
         }
     }
 
     /// <inheritdoc />
     public override void Remove()
     {
-        Host = null;
+        Bot = null;
         MessageReceivedDisposable?.Dispose();
     }
 

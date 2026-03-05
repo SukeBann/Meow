@@ -1,5 +1,4 @@
 ﻿using FreeSql.DataAnnotations;
-using Newtonsoft.Json;
 
 namespace Meow.Core.Model.Base;
 
@@ -12,7 +11,7 @@ public abstract class DatabaseRecordBase
     /// 数据库id
     /// </summary>
     [Column(IsIdentity = true, IsPrimary = true)]
-    public int DbId { get; set; }
+    public long DbId { get; set; }
 
     /// <summary>
     /// 是否被删除

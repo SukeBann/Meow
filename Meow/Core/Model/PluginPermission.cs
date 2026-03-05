@@ -8,7 +8,9 @@ namespace Meow.Core.Model;
 /// </summary>
 public class PluginPermission : DatabaseRecordBase
 {
-    public PluginPermission() { }
+    public PluginPermission()
+    {
+    }
 
     public PluginPermission(bool isNeedAdminPermission, string uid, string pluginName)
     {
@@ -43,11 +45,11 @@ public class PluginPermission : DatabaseRecordBase
     /// <br/>那么只有白名单用户和管理员才可以使用
     /// </summary>
     [Column(StringLength = -1)]
-    public List<uint> WhiteList { get; private set; } = new();
+    public List<long> WhiteList { get; private set; } = new();
 
     /// <summary>
     /// 黑名单中的用户不能使用该插件下的任何功能
     /// </summary>
     [Column(StringLength = -1)]
-    public List<uint> BlackList { get; private set; } = new();
+    public List<long> BlackList { get; private set; } = new();
 }

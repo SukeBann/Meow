@@ -1,5 +1,7 @@
 using System.Collections.ObjectModel;
 
+namespace Meow.UI.ViewModels.Models;
+
 /// <summary>
 /// 表示一个具有固定容量的可观察集合。
 /// 当集合达到容量时，新添加的元素将会移除最早进入的元素。

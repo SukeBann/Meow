@@ -65,6 +65,10 @@ public class MeowDatabase
 
         var identity = FreeSql.Insert<T>().AppendData(target).ExecuteIdentity();
         Logger.Debug("Insert Result ID: {Id}", identity);
+        if (target is DatabaseRecordBase recordBase)
+        {
+            recordBase.DbId = identity;
+        }
         return identity;
     }
 

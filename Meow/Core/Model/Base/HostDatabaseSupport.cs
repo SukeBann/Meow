@@ -13,16 +13,16 @@ public abstract class HostDatabaseSupport
     /// </summary>
     protected MeowDatabase Database { get; }
 
-    protected Meow Host { get; }
+    protected Meow Bot { get; }
 
     /// <summary>
     /// 用指定的Meow对象初始化HostDatabaseSupport类的新实例。
     /// </summary>
-    /// <param name="host">此实例将用于操作的Meow对象。</param>
-    protected HostDatabaseSupport(Meow host)
+    /// <param name="bot">此实例将用于操作的Meow对象。</param>
+    protected HostDatabaseSupport(Meow bot)
     {
-        Host = host;
-        Database = host.Database;
+        Bot = bot;
+        Database = bot.Database;
     }
 
     /// <summary>

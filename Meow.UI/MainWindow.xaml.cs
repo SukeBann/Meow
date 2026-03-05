@@ -1,8 +1,5 @@
 ﻿using System.Windows;
-using Lagrange.Core.Common;
-using Lagrange.Core.Common.Interface.Api;
 using Meow.Bootstrapper;
-using Meow.Core.Enum;
 using Meow.Plugin;
 using Meow.Plugin.HelpPlugin;
 using Meow.Plugin.NeverStopTalkingPlugin;
@@ -11,7 +8,6 @@ using Meow.UI.Utils;
 using Meow.UI.ViewModels;
 using Meow.UI.Views;
 using Meow.Utils;
-using Serilog;
 
 namespace Meow.UI;
 

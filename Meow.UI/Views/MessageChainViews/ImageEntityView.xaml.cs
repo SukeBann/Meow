@@ -1,8 +1,6 @@
 ﻿using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Input;
 using System.Windows.Media.Imaging;
-using Lagrange.Core.Message.Entity;
 using PropertyChanged;
 
 namespace Meow.UI.Views.MessageChainViews;

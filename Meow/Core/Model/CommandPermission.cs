@@ -5,7 +5,9 @@ namespace Meow.Core.Model;
 
 public class CommandPermission : DatabaseRecordBase
 {
-    public CommandPermission() { }
+    public CommandPermission()
+    {
+    }
 
     public CommandPermission(bool isNeedAdminPermission, string commandName, string commandUid)
     {
@@ -34,11 +36,11 @@ public class CommandPermission : DatabaseRecordBase
     /// <br/>那么只有白名单用户和管理员才可以使用
     /// </summary>
     [Column(StringLength = -1)]
-    public List<uint> WhiteList { get; set; } = new();
+    public List<long> WhiteList { get; set; } = new();
 
     /// <summary>
     /// 黑名单中的用户不能使用该命令
     /// </summary>
     [Column(StringLength = -1)]
-    public List<uint> BlackList { get; set; } = new();
+    public List<long> BlackList { get; set; } = new();
 }

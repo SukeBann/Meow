@@ -1,6 +1,7 @@
-﻿using System.Collections.Concurrent;
-using FreeSql.DataAnnotations;
+﻿using FreeSql.DataAnnotations;
+using Masuit.Tools;
 using Meow.Core.Model.Base;
+using Newtonsoft.Json;
 
 namespace Meow.Plugin.NeverStopTalkingPlugin.Models;
 
@@ -9,7 +10,9 @@ namespace Meow.Plugin.NeverStopTalkingPlugin.Models;
 /// </summary>
 public class BagOfWordRecord : DatabaseRecordBase
 {
-    public BagOfWordRecord() { }
+    public BagOfWordRecord()
+    {
+    }
 
     /// <summary>
     /// 创建词袋
@@ -17,7 +20,7 @@ public class BagOfWordRecord : DatabaseRecordBase
     /// <param name="maxCount">最大长度</param>
     /// <param name="uin">群id或qq</param>
     /// <param name="bagOfWordType">词袋类型</param>
-    public BagOfWordRecord(int maxCount, uint uin, BagOfWordType bagOfWordType)
+    public BagOfWordRecord(int maxCount, long uin, BagOfWordType bagOfWordType)
     {
         MaxCount = maxCount;
         BagOfWordType = bagOfWordType;
@@ -31,6 +34,13 @@ public class BagOfWordRecord : DatabaseRecordBase
     /// <br/> value: 索引
     /// </summary>
     [Column(StringLength = -1)]
+    public string BagOfWordJson
+    {
+        get => JsonConvert.SerializeObject(BagOfWord);
+        set => BagOfWord = value.IsNullOrEmpty() ? new() : JsonConvert.DeserializeObject<Dictionary<string, int>>(value) ?? new();
+    }
+    
+    [Column(IsIgnore = true)]
     public Dictionary<string, int> BagOfWord { get; set; } = new();
 
     /// <summary>
@@ -57,7 +67,7 @@ public class BagOfWordRecord : DatabaseRecordBase
 
             if (BagOfWord.ContainsKey(word))
             {
-               continue; 
+                continue;
             }
 
             if (BagOfWord.TryAdd(word, 0))
@@ -90,7 +100,7 @@ public class BagOfWordRecord : DatabaseRecordBase
     /// <summary>
     /// 群id | qq | global:0
     /// </summary>
-    public uint Uin { get; set; }
+    public long Uin { get; set; }
 
     /// <summary>
     /// 词袋类型

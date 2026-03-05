@@ -1,7 +1,6 @@
-﻿using Lagrange.Core;
-using Lagrange.Core.Common.Interface.Api;
-using Lagrange.Core.Message;
-using Meow.Bootstrapper;
+﻿using Camille.Core.MiraiBase.Contract;
+using Camille.Core.MiraiBase.Models.Base;
+using Camille.Imp.MiraiBase;
 using Meow.Utils;
 using Serilog;
 
@@ -10,13 +9,13 @@ namespace Meow.Core;
 /// <summary>
 /// 万Meow之祖
 /// </summary>
-public abstract class MeowBase
+public abstract class MeowBase: MiraiBot
 {
-    protected MeowBase(string meowName, string workFolder)
+    protected MeowBase(IMiraiBotConfig miraiBotConfig, string meowName, string workFolder) : base(miraiBotConfig)
     {
         MeowName = meowName;
         WorkFolder = workFolder;
-        Log = LoggerCreator.GenerateLoggerConfig(workFolder).CreateLogger();
+        Log = Ioc.GetService<ILogger>() ?? LoggerCreator.GenerateLoggerConfig(workFolder).CreateLogger();
         Log.Debug("Meow Ctor invoke, work folder: {WorkFolder}", workFolder);
         Database = new MeowDatabase(WorkFolder, MeowName, Log);
     }
@@ -27,14 +26,9 @@ public abstract class MeowBase
 
     public string MeowName { get; }
 
-    /// <summary>
-    /// <see cref="Lagrange.Core.BotContext"/>提供了bot的基本设施
-    /// Meow是在其基础上实现的
-    /// </summary>
-    public BotContext MeowBot { get; set; }
 
     private ILogger Log { get; set; }
-    
+
     /// <summary>
     /// 数据库
     /// </summary>
@@ -46,34 +40,10 @@ public abstract class MeowBase
 
     public async Task Login()
     {
-        if (BotInfoManager.KeystoreIsExist(WorkFolder))
-        {
-            await MeowBot.LoginByPassword().ConfigureAwait(false);
-            return;
-        }
-
-        var fetchQrCode = await MeowBot.FetchQrCode();
-        if (fetchQrCode != null)
-        {
-            var path = Path.Combine(WorkFolder, "qr.png");
-            await File.WriteAllBytesAsync(path, fetchQrCode.Value.QrCode).ConfigureAwait(false);
-            Info($"GetQrCodeUrl: {fetchQrCode?.Url}, Image:{path}");
-            await MeowBot.LoginByQrCode().ConfigureAwait(false);
-        }
-        else
-        {
-            Error("获取二维码失败, 无法成功登录");
-        }
+        await LinkStart();
+        Info("Bot LinkStart invoked");
     }
 
-    /// <summary>
-    /// 发送消息
-    /// </summary>
-    /// <param name="messageChain">发送消息</param>
-    public async Task SendMessage(MessageChain messageChain)
-    {
-        await MeowBot.SendMessage(messageChain).ConfigureAwait(false);
-    }
 
     #endregion
 

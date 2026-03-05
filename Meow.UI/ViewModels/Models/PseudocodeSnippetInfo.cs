@@ -1,8 +1,4 @@
-﻿using System.Windows.Documents;
-using Lagrange.Core.Message;
-using Lagrange.Core.Message.Entity;
-using PropertyChanged;
-using SixLabors.ImageSharp;
+﻿using PropertyChanged;
 
 namespace Meow.UI.ViewModels.Models;
 

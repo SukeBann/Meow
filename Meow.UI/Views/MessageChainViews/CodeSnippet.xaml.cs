@@ -1,6 +1,6 @@
 ﻿using System.Windows;
 using System.Windows.Controls;
-using Lagrange.Core.Message;
+
 using Lagrange.Core.Message.Entity;
 using Meow.UI.ViewModels;
 using Meow.UI.ViewModels.Models;

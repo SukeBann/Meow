@@ -1,8 +1,8 @@
 ﻿using System.Reactive.Concurrency;
 using System.Reactive.Linq;
-using System.Runtime.Versioning;
-using Lagrange.Core.Event;
-using Lagrange.Core.Message;
+using Camille.Imp.Extension;
+using Camille.Imp.MiraiBase.Message;
+using Camille.Imp.MiraiBase.Message.MessageContainer;
 
 namespace Meow.Core.Model.Base;
 
@@ -17,7 +17,7 @@ public abstract class PluginBase : IMeowPlugin
     /// <summary>
     /// 插件宿主
     /// </summary>
-    protected Meow? Host { get; set; }
+    protected Meow? Bot { get; set; }
 
     /// <summary>
     /// 命令处理订阅
@@ -39,7 +39,7 @@ public abstract class PluginBase : IMeowPlugin
     /// <inheritdoc />
     public virtual void InjectPlugin(Meow host)
     {
-        Host = host;
+        Bot = host;
         SubscribeCommand();
     }
 
@@ -48,57 +48,72 @@ public abstract class PluginBase : IMeowPlugin
     /// </summary>
     protected virtual void SubscribeCommand()
     {
-        if (Host is null)
+        if (Bot is null)
         {
             return;
         }
+
         // 没有命令就不订阅
         if (!HaveAnyCommands)
         {
             return;
         }
 
-        CommandParserDisposable = Host.OnCommandReceived.ObserveOn(ThreadPoolScheduler.Instance)
-            .Subscribe(CommandParser);
+        CommandParserDisposable = Bot.OnCommandReceived.ObserveOn(ThreadPoolScheduler.Instance)
+            .Subscribe(x => CommandParser(x.meow, x.msg, x.command, x.args));
     }
 
     /// <summary>
     /// 命令解析器
     /// </summary>
-    /// <param name="commandArgs"></param>
-    protected virtual async void CommandParser(
-        (Meow meow, MessageChain messageChain, EventBase @event, string command, string? args) commandArgs)
+    protected virtual async void CommandParser(Meow meow, MiraiMsgContainerBase container, string command, string? args)
     {
         try
         {
-            var (meow, messageChain, _, command, args) = commandArgs;
             var targetCommand = Commands.FirstOrDefault(x => x.CommandTrigger == command);
-            if (targetCommand is null || !targetCommand.CommandTrigger.Equals(targetCommand!.CommandTrigger))
+            if (targetCommand is null)
             {
                 return;
             }
 
-            if (!meow.GetUserPermission(messageChain.FriendUin, targetCommand))
+            long senderId = 0;
+            if (container is GroupMiraiMsgContainer groupMiraiMsg)
+            {
+                senderId = groupMiraiMsg?.Sender?.Id ?? 0;
+            }
+            else
+            {
+                senderId = container.Sender?.Id ?? 0;
+            }
+            
+            if (senderId == 0)
+            {
+                Bot?.Error("Sender ID cannot be 0");
+                return;
+            }
+
+            if (!meow.GetUserPermission(senderId, targetCommand))
             {
                 return;
             }
 
-            var commandResult = await targetCommand.RunCommand(meow, messageChain, args).ConfigureAwait(false);
+            var commandResult = await targetCommand.RunCommand(meow, container, args).ConfigureAwait(false);
             if (commandResult.needSendMessage)
             {
-                await meow.SendMessage(commandResult.messageChain).ConfigureAwait(false);
+                container.MessageChain = commandResult.messageChain;
+                await container.SendToAsync(meow).ConfigureAwait(false);
             }
         }
         catch (Exception e)
         {
-            commandArgs.meow.Error("Error On Command Parser", e);
+            meow.Error("Error On Command Parser", e);
         }
     }
 
     /// <inheritdoc />
     public virtual void Remove()
     {
-        Host = null;
+        Bot = null;
     }
 
     ~PluginBase()

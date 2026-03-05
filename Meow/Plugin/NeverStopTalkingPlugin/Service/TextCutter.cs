@@ -1,8 +1,8 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using System.Text.RegularExpressions;
 using JiebaNet.Segmenter;
-using Lagrange.Core.Message;
-using Lagrange.Core.Message.Entity;
+using Camille.Core.MiraiBase.Models.Base;
+using Camille.Core.MiraiBase.Models.BasicMessage;
 using Masuit.Tools;
 using Meow.Utils;
 
@@ -68,8 +68,8 @@ public partial class TextCutter
     private string ConvertToPlainText(MessageChain messageChain)
     {
         var rawData = string.Join(" ",
-                messageChain.Where(x => x is TextEntity)
-                    .Select(x => x.ToPreviewText()))
+                messageChain.Where(x => x is Plain)
+                    .Select(x => ((Plain) x).Text))
             .Trim()
             .Replace("\r", "")
             .Replace("\n", "");
@@ -90,7 +90,7 @@ public partial class TextCutter
         // 拼接停用词文件路径
         var filePath = Path.Combine(appCurrentPath, "PluginResource", "NeverStopTalkingPlugin", "停用词.txt");
         // 检查文件是否存在
-        if (!File.Exists(filePath))
+        if (!System.IO.File.Exists(filePath))
         {
             // 记录错误信息并抛出异常
             Host.Error($"插件[{nameof(NeverStopTalkingPlugin)}]加载中出现异常, 停用词文件路径不存在");
@@ -126,7 +126,7 @@ public partial class TextCutter
     /// <param name="textMessage"></param>
     /// <param name="filterResult"></param>
     /// <returns></returns>
-    public bool CutPlainText(string textMessage, [MaybeNullWhen(true)]out string[] filterResult)
+    public bool CutPlainText(string textMessage, [MaybeNullWhen(true)] out string[] filterResult)
     {
         var cutResult = WordCutter.Cut(textMessage, cutAll: true)
             .Where(x => !StopWord.Contains(x))
@@ -149,8 +149,8 @@ public partial class TextCutter
         // 分词数量小于2的视为没有分到词
         return filterResult.Length < 2;
     }
-    
-    
+
+
     /// <summary>
     /// 获取文本消息并进行处理。
     /// </summary>
@@ -164,12 +164,6 @@ public partial class TextCutter
     {
         filterResult = null;
         textMessage = string.Empty;
-
-        // 不处理自身消息
-        if (messageChain.FriendUin == Host.MeowBot.BotUin)
-        {
-            return true;
-        }
 
         textMessage = ConvertToPlainText(messageChain);
         if (textMessage.IsNullOrEmpty())
@@ -186,5 +180,4 @@ public partial class TextCutter
         Host.Info($"分词筛选后结果: {string.Join(",", filterResult)}");
         return false;
     }
-
 }

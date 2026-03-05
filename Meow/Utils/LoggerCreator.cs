@@ -4,6 +4,15 @@ namespace Meow.Utils;
 
 public static class LoggerCreator
 {
+    /// <summary>
+    /// 将 Serilog 转换并注入到 Camille 的日志系统中
+    /// </summary>
+    /// <param name="serilog"></param>
+    public static void SyncToCamille(Serilog.ILogger serilog)
+    {
+        Camille.Shared.Logger.SetLogger(new Camille.Logger.SerilogAdapter(serilog));
+    }
+
     private static string CheckAndCreateDirectory(string basePath, string filePath)
     {
         var logPath = Path.Combine(basePath, "Log");
@@ -50,7 +59,7 @@ public static class LoggerCreator
                 fileSizeLimitBytes: 2 * 1024 * 1024,
                 retainedFileCountLimit: 10)
             .WriteTo.Console()
-            .MinimumLevel.Information();
+            .MinimumLevel.Debug();
 #if DEBUG
         // loggerConfiguration.MinimumLevel.Debug()
             // .WriteTo.Debug();

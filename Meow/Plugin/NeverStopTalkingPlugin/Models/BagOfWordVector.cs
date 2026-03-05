@@ -1,5 +1,7 @@
 ﻿using FreeSql.DataAnnotations;
+using Masuit.Tools;
 using Meow.Core.Model.Base;
+using Newtonsoft.Json;
 
 namespace Meow.Plugin.NeverStopTalkingPlugin.Models;
 
@@ -8,9 +10,12 @@ namespace Meow.Plugin.NeverStopTalkingPlugin.Models;
 /// </summary>
 public class BagOfWordVector : DatabaseRecordBase
 {
-    public BagOfWordVector() { }
+    public BagOfWordVector()
+    {
+    }
 
-    public BagOfWordVector(int bagOfWordId, BagOfWordType bagOfWordType, uint uin, int msgId, string msgMd5, int maxCount, VectorElementIndex[] vectorElementIndex)
+    public BagOfWordVector(long bagOfWordId, BagOfWordType bagOfWordType, long uin, long msgId, string msgMd5,
+        int maxCount, VectorElementIndex[] vectorElementIndex)
     {
         BagOfWordId = bagOfWordId;
         BagOfWordType = bagOfWordType;
@@ -24,7 +29,7 @@ public class BagOfWordVector : DatabaseRecordBase
     /// <summary>
     /// 词袋db id
     /// </summary>
-    public int BagOfWordId { get; set; }
+    public long BagOfWordId { get; set; }
 
     /// <summary>
     /// 词袋类型
@@ -34,12 +39,12 @@ public class BagOfWordVector : DatabaseRecordBase
     /// <summary>
     /// 如果是群词袋对应group id， 个人词袋对应 id
     /// </summary>
-    public uint Uin { get; set; }
+    public long Uin { get; set; }
 
     /// <summary>
     /// 消息 db id
     /// </summary>
-    public int MsgId { get; set; }
+    public long MsgId { get; set; }
 
     /// <summary>
     /// 计算出的消息的Md5 用于与bagOfWordId一起快速判断该消息是否已经被计算过向量
@@ -55,6 +60,13 @@ public class BagOfWordVector : DatabaseRecordBase
     /// 向量中有技术的索引位置 以及命中次数, 用于结合向量长度生成向量, 节约存储和查询成本
     /// </summary>
     [Column(StringLength = -1)]
+    public string VectorElementIndexJson
+    {
+        get => JsonConvert.SerializeObject(VectorElementIndex);
+        set => VectorElementIndex = value.IsNullOrEmpty() ? Array.Empty<VectorElementIndex>() : JsonConvert.DeserializeObject<VectorElementIndex[]>(value) ?? Array.Empty<VectorElementIndex>();
+    }
+
+    [Column(IsIgnore = true)]
     public VectorElementIndex[] VectorElementIndex { get; set; }
 }
 

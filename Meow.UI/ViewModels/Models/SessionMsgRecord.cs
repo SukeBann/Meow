@@ -1,4 +1,4 @@
-﻿using Lagrange.Core.Message;
+﻿
 using PropertyChanged;
 
 namespace Meow.UI.ViewModels.Models;

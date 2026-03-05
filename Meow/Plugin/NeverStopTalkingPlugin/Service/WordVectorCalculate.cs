@@ -1,7 +1,5 @@
 ﻿using MathNet.Numerics.LinearAlgebra;
-using MathNet.Numerics.LinearAlgebra.Double;
 using Meow.Plugin.NeverStopTalkingPlugin.Models;
-using Vector = MathNet.Numerics.LinearAlgebra.Complex32.Vector;
 
 namespace Meow.Plugin.NeverStopTalkingPlugin.Service;
 
@@ -17,7 +15,7 @@ public class WordVectorCalculate
     /// <param name="target">计算结果</param>
     /// <param name="threshold"></param>
     /// <returns></returns>
-    public List<(double similarity, int msgId)> GetSimilarString(List<BagOfWordVector> totalVector,
+    public List<(double similarity, long msgId)> GetSimilarString(List<BagOfWordVector> totalVector,
         BagOfWordVector target, double threshold)
     {
 
@@ -28,7 +26,7 @@ public class WordVectorCalculate
 
         // 计算余弦相似度
         var denseMatrixRowCount = denseMatrix.Length;
-        var similarities = new List<(double similarity, int msgId)>();
+        var similarities = new List<(double similarity, long msgId)>();
         Parallel.For(0, denseMatrixRowCount, i =>
         {
             var vector = denseMatrix[i].vector;
@@ -79,7 +77,7 @@ public class WordVectorCalculate
     /// </summary>
     /// <param name="bagOfWordVectors">词袋向量集合</param>
     /// <returns></returns>
-    private (Vector<double> vector, int msgId)[] UnfoldVectorList(List<BagOfWordVector> bagOfWordVectors)
+    private (Vector<double> vector, long msgId)[] UnfoldVectorList(List<BagOfWordVector> bagOfWordVectors)
     {
         return bagOfWordVectors.Select(x =>
         {

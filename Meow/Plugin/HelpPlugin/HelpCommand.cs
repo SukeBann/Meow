@@ -1,9 +1,9 @@
 ﻿using System.Text;
-using Lagrange.Core.Message;
+using Camille.Core.MiraiBase.Models.Base;
+using Camille.Imp.MiraiBase.Message;
 using Masuit.Tools;
 using Meow.Core;
 using Meow.Utils;
-using Microsoft.EntityFrameworkCore.Metadata.Internal;
 
 namespace Meow.Plugin.HelpPlugin;
 
@@ -29,39 +29,40 @@ public class HelpCommand : IMeowCommand
 
     /// <inheritdoc />
     public string CommandHelpDescription => """
-                                        help 命令:
+                                            help 命令:
 
-                                        获取bot的所有可用命令>
-                                        示例：help 
-                                        >> 结果为bot的所有可用命令
+                                            获取bot的所有可用命令>
+                                            示例：help 
+                                            >> 结果为bot的所有可用命令
 
-                                        获取目标命令的用法>
-                                        help 目标命令
-                                        示例： help help
-                                        >>结果为help命令的使用方法
-                                        """;
+                                            获取目标命令的用法>
+                                            help 目标命令
+                                            示例： help help
+                                            >>结果为help命令的使用方法
+                                            """;
 
     /// <inheritdoc />
-    public Task<(bool needSendMessage, MessageChain messageChain)> RunCommand(Core.Meow meow, MessageChain messageChain,
+    public Task<(bool needSendMessage, MessageChain messageChain)> RunCommand(Core.Meow meow,
+        MiraiMsgContainerBase container,
         string? args)
     {
         if (args.IsNullOrEmpty())
         {
-            return Task.FromResult((true, GetHelpAll(meow, messageChain)));
+            return Task.FromResult((true, GetHelpAll(meow, container.MessageChain)));
         }
 
-        var isSuccess = new CommandArgsCheckUtil(messageChain, args)
+        var isSuccess = new CommandArgsCheckUtil(container.MessageChain, args)
             .IsSuccess(out var message, out var chain, out var argStr, out var argList);
         if (!isSuccess)
         {
-            return Task.FromResult((true, messageChain.CreateSameTypeTextMessage(message)));
+            return Task.FromResult((true, (MessageChain)message));
         }
 
         var target = meow.Plugins.SelectMany(x => x.Commands)
             .FirstOrDefault(x => x.CommandTrigger == argStr);
         return Task.FromResult(target is null
-            ? (true, messageChain.CreateSameTypeTextMessage($"未查询到命令{argStr}"))
-            : (true, messageChain.CreateSameTypeTextMessage(target.CommandHelpDescription)));
+            ? (true, (MessageChain)$"未查询到命令{argStr}")
+            : (true, target.CommandHelpDescription));
     }
 
     /// <summary>
@@ -74,7 +75,7 @@ public class HelpCommand : IMeowCommand
         {
             var stringBuilder = new StringBuilder();
             stringBuilder.AppendLine("获取到了当前所有可用命令, 使用help加对应命令名可以获取详细用法");
-            
+
             var enumerable = meow.Plugins.SelectMany(x => x.Commands)
                 .Select(x => x.CommandPrint)
                 .Where(x => !x.IsNullOrEmpty())
@@ -88,6 +89,6 @@ public class HelpCommand : IMeowCommand
             AllCommandHelpCacheSeed = meow.PluginChangeSeed;
         }
 
-        return messageChain.CreateSameTypeTextMessage(AllCommandHelpCache!);
+        return AllCommandHelpCache!;
     }
 }

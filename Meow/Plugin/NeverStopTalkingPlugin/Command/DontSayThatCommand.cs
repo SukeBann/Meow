@@ -1,4 +1,5 @@
-﻿using Lagrange.Core.Message;
+﻿using Camille.Core.MiraiBase.Models.Base;
+using Camille.Imp.MiraiBase.Message;
 using Meow.Core;
 using Meow.Plugin.NeverStopTalkingPlugin.Service;
 using Meow.Utils;
@@ -27,25 +28,25 @@ public class NstDontSayThatCommand(ForbiddenWordsManager forbiddenWordsManager) 
 
     /// <inheritdoc />
     public string CommandHelpDescription => """
-                                        dontSayThat 命令:
+                                            dontSayThat 命令:
 
-                                        不让机器人在胡说八道时说出违禁词>
-                                        示例：dontSayThat add 牛马(违禁词字数范围1 - 4) 
-                                        >> 此后机器人便不会在胡说八道时说出带牛马的词
+                                            不让机器人在胡说八道时说出违禁词>
+                                            示例：dontSayThat add 牛马(违禁词字数范围1 - 4) 
+                                            >> 此后机器人便不会在胡说八道时说出带牛马的词
 
-                                        移除违禁词>
-                                        示例：dontSayThat remove 牛马 
-                                        >> 移除之前添加的某个违禁词
-                                        """;
+                                            移除违禁词>
+                                            示例：dontSayThat remove 牛马 
+                                            >> 移除之前添加的某个违禁词
+                                            """;
 
     /// <inheritdoc />
-    public Task<(bool needSendMessage, MessageChain messageChain)> RunCommand(Core.Meow meow, MessageChain messageChain,
+    public Task<(bool needSendMessage, MessageChain messageChain)> RunCommand(Core.Meow meow,
+        MiraiMsgContainerBase container,
         string? args)
     {
-        var sender = messageChain.FriendUin;
-        var emptyMessage = messageChain.CreateSameTypeMessageBuilder();
+        var sender = container.Sender.Id;
 
-        var argsCheck = new CommandArgsCheckUtil(messageChain, args);
+        var argsCheck = new CommandArgsCheckUtil(container.MessageChain, args);
         var checkResult = argsCheck
             .SplitArgsAndCheckLength(' ', 2, new Range(2, 2), "参数数量错误, 请检查参数格式")
             .ArgListMatch(0, ["add", "remove"])
@@ -57,7 +58,7 @@ public class NstDontSayThatCommand(ForbiddenWordsManager forbiddenWordsManager) 
             return Task.FromResult((true, errorMessageChain));
         }
 
-        var action = splitResult[0];
+        var action = splitResult![0];
         var forbiddenWord = splitResult[1];
         if (action == "add")
         {
@@ -68,7 +69,6 @@ public class NstDontSayThatCommand(ForbiddenWordsManager forbiddenWordsManager) 
             ForbiddenWordsManager.RemoveForbiddenWord(forbiddenWord);
         }
 
-        emptyMessage.Text($"命令已执行 {(action == "add" ? "添加" : "删除")}违禁词: {forbiddenWord}");
-        return Task.FromResult((true, emptyMessage.Build()));
+        return Task.FromResult((true, (MessageChain)$"命令已执行 {(action == "add" ? "添加" : "删除")}违禁词: {forbiddenWord}"));
     }
 }

@@ -8,9 +8,11 @@ namespace Meow.Core.Model;
 /// </summary>
 public class UserInfo : DatabaseRecordBase
 {
-    public UserInfo() { }
+    public UserInfo()
+    {
+    }
 
-    public UserInfo(uint uin, UserPermission userPermission)
+    public UserInfo(long uin, UserPermission userPermission)
     {
         Uin = uin;
         UserPermission = userPermission;
@@ -19,7 +21,7 @@ public class UserInfo : DatabaseRecordBase
     /// <summary>
     /// uid 俗称qq号
     /// </summary>
-    public uint Uin { get; set; }
+    public long Uin { get; set; }
 
     /// <summary>
     /// 权限等级

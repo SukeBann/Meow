@@ -7,31 +7,35 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Autofac" Version="8.0.0" />
-        <PackageReference Include="BloomFilter.NetCore" Version="2.2.1" />
-        <PackageReference Include="FreeSql.Provider.Sqlite" Version="3.5.305" />
-        <PackageReference Include="jieba.NET" Version="0.42.2" />
-        <PackageReference Include="Lagrange.Core" Version="0.3.1" />
-        <PackageReference Include="LiteDB" Version="5.0.21" />
-        <PackageReference Include="Masuit.Tools.Core" Version="2024.4.5" />
-        <PackageReference Include="MathNet.Numerics" Version="5.0.0" />
-        <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
-        <PackageReference Include="QRCoder-ImageSharp" Version="0.10.0" />
-        <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
-        <PackageReference Include="Serilog.Sinks.Debug" Version="3.0.0" />
-        <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
-        <PackageReference Include="System.Reactive" Version="6.0.1" />
+        <PackageReference Include="Autofac" Version="8.0.0"/>
+        <PackageReference Include="BloomFilter.NetCore" Version="2.2.1"/>
+        <PackageReference Include="FreeSql.Provider.Sqlite" Version="3.5.305"/>
+        <PackageReference Include="jieba.NET" Version="0.42.2"/>
+        <PackageReference Include="LiteDB" Version="5.0.21"/>
+        <PackageReference Include="Masuit.Tools.Core" Version="2026.1.0" />
+        <PackageReference Include="MathNet.Numerics" Version="5.0.0"/>
+        <PackageReference Include="Newtonsoft.Json" Version="13.0.4"/>
+        <PackageReference Include="QRCoder-ImageSharp" Version="0.10.0"/>
+        <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0"/>
+        <PackageReference Include="Serilog.Sinks.Debug" Version="3.0.0"/>
+        <PackageReference Include="Serilog.Sinks.File" Version="6.0.0"/>
+        <PackageReference Include="System.Reactive" Version="6.0.1"/>
     </ItemGroup>
 
     <ItemGroup>
-      <None Remove="PluginResource\NeverStopTalkingPlugin\stop_words.txt" />
-      <Content Include="PluginResource\NeverStopTalkingPlugin\停用词.txt">
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      </Content>
+        <None Remove="PluginResource\NeverStopTalkingPlugin\stop_words.txt"/>
+        <Content Include="PluginResource\NeverStopTalkingPlugin\停用词.txt">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
     </ItemGroup>
 
     <ItemGroup>
-      <Folder Include="PluginResource\UsagiPlugin\Image\" />
+        <Folder Include="PluginResource\UsagiPlugin\Image\"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\..\Tools\Camille\Camille.Core\Camille.Core.csproj"/>
+        <ProjectReference Include="..\..\..\Tools\Camille\Camille.Imp\Camille.Imp.csproj"/>
     </ItemGroup>
 
 </Project>

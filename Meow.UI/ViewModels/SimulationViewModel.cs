@@ -1,6 +1,6 @@
 ﻿using System.Collections.ObjectModel;
 using System.Diagnostics.CodeAnalysis;
-using Lagrange.Core.Message;
+
 using Meow.Core.Model.Base;
 using Meow.UI.ViewModels.Models;
 using PropertyChanged;
@@ -11,10 +11,10 @@ namespace Meow.UI.ViewModels;
 public class SimulationViewModel: HostDatabaseSupport
 {
     /// <inheritdoc />
-    public SimulationViewModel(Core.Meow host) : base(host)
+    public SimulationViewModel(Core.Meow bot) : base(bot)
     {
         //TODO 这里先模拟创建好
-        var sessionInfo = new SessionInfo(host, MessageChain.MessageType.Group, 726070631, "模拟名称", "模拟重命名");
+        var sessionInfo = new SessionInfo(bot, MessageChain.MessageType.Group, 726070631, "模拟名称", "模拟重命名");
         ChatSession.Add(sessionInfo);
         SessionMapping.Add(sessionInfo.SessionUUID, sessionInfo);
     }

@@ -11,6 +11,7 @@ public partial class Meow
     /// 用户信息数据库集合
     /// </summary>
     private const string MeowUserInfoCollection = nameof(MeowUserInfoCollection);
+
     /// <summary>
     /// 插件权限数据库集合
     /// </summary>
@@ -19,7 +20,7 @@ public partial class Meow
     /// <summary>
     /// key为uid 用户信息
     /// </summary>
-    private Dictionary<uint, UserInfo> UserInfoDict { get; set; } = new();
+    private Dictionary<long, UserInfo> UserInfoDict { get; set; } = new();
 
     /// <summary>
     /// key为uid 插件权限
@@ -38,13 +39,15 @@ public partial class Meow
     private void UpdatePluginPermission(IMeowPlugin plugin)
     {
         var uid = plugin.PluginUid;
-        if (PluginPermissionDict.ContainsKey(uid))
+        PluginPermission pluginPermission;
+        bool isNewPlugin = false;
+        
+        if (!PluginPermissionDict.TryGetValue(uid, out pluginPermission))
         {
-            return;
+            pluginPermission = new PluginPermission(plugin.IsNeedAdmin, plugin.PluginUid, plugin.PluginName);
+            PluginPermissionDict.Add(plugin.PluginUid, pluginPermission);
+            isNewPlugin = true;
         }
-
-        var pluginPermission = new PluginPermission(plugin.IsNeedAdmin, plugin.PluginUid, plugin.PluginName);
-        PluginPermissionDict.Add(plugin.PluginUid, pluginPermission);
 
         foreach (var command in plugin.Commands)
         {
@@ -59,8 +62,15 @@ public partial class Meow
             CommandPermissionDict.Add(command.CommandUid, commandPermission);
         }
 
-        Info("添加一条新的插件权限信息到数据库");
-        Database.Insert(pluginPermission, MeowPluginPermissionCollection);
+        if (isNewPlugin)
+        {
+            Info("添加一条新的插件权限信息到数据库");
+            Database.Insert(pluginPermission, MeowPluginPermissionCollection);
+        }
+        else
+        {
+            Database.Update(pluginPermission, MeowPluginPermissionCollection);
+        }
     }
 
     /// <summary>
@@ -96,12 +106,13 @@ public partial class Meow
     /// </summary>
     /// <param name="uin"></param>
     /// <returns></returns>
-    private UserInfo GetUser(uint uin)
+    private UserInfo GetUser(long uin)
     {
         if (UserInfoDict.TryGetValue(uin, out var user))
         {
             return user;
         }
+
         var userInfo = new UserInfo(uin, UserPermission.User);
         if (Database.Query<UserInfo>(MeowUserInfoCollection)
                 .Where(x => !x.HasDelete)
@@ -110,8 +121,9 @@ public partial class Meow
         {
             Database.Insert(userInfo, MeowUserInfoCollection);
         }
+
         UserInfoDict.Add(userInfo.Uin, userInfo);
-        
+
         Info($"创建新用户:{uin}, 权限等级：{UserPermission.User}");
         return userInfo;
     }
@@ -120,7 +132,7 @@ public partial class Meow
     /// 获取指定uin用户是否拥有指定插件的权限
     /// </summary>
     /// <param name="uin"></param>
-    public bool GetUserPermission(uint uin, IMeowPlugin plugin)
+    public bool GetUserPermission(long uin, IMeowPlugin plugin)
     {
         var userInfo = GetUser(uin);
         if (userInfo.UserPermission is UserPermission.Blacklist)
@@ -165,7 +177,7 @@ public partial class Meow
     /// 获取指定uin用户是否拥有指定命令的权限
     /// </summary>
     /// <param name="uin"></param>
-    public bool GetUserPermission(uint uin, IMeowCommand command)
+    public bool GetUserPermission(long uin, IMeowCommand command)
     {
         var userInfo = GetUser(uin);
         if (userInfo.UserPermission is UserPermission.Blacklist)
@@ -210,7 +222,7 @@ public partial class Meow
     /// </summary>
     /// <param name="uin"></param>
     /// <param name="permission"></param>
-    public void EditUserPermission(uint uin, UserPermission permission)
+    public void EditUserPermission(long uin, UserPermission permission)
     {
         var userInfo = GetUser(uin);
         userInfo.UserPermission = permission;
@@ -224,7 +236,7 @@ public partial class Meow
     /// <param name="isAdd">是否为添加操作, 如果为false则是从名单中移除</param>
     /// <param name="plugin">插件</param>
     /// <param name="command">命令</param>
-    public void EditWhiteList(uint uin, bool isAdd, IMeowPlugin plugin, IMeowCommand? command = null)
+    public void EditWhiteList(long uin, bool isAdd, IMeowPlugin plugin, IMeowCommand? command = null)
     {
         var userInfo = GetUser(uin);
         if (userInfo.UserPermission is UserPermission.Admin)
@@ -278,7 +290,7 @@ public partial class Meow
     /// <param name="isAdd">是否为添加操作, 如果为false则是从名单中移除</param>
     /// <param name="plugin">插件</param>
     /// <param name="command">命令</param>
-    public void EditBlackList(uint uin, bool isAdd, IMeowPlugin plugin = null, IMeowCommand? command = null)
+    public void EditBlackList(long uin, bool isAdd, IMeowPlugin plugin = null, IMeowCommand? command = null)
     {
         var userInfo = GetUser(uin);
         if (userInfo.UserPermission is UserPermission.Admin)

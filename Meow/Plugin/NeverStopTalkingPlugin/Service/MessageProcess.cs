@@ -1,13 +1,12 @@
 ﻿using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
-using System.Text.RegularExpressions;
-using JiebaNet.Segmenter;
-using Lagrange.Core.Message;
-using Lagrange.Core.Message.Entity;
-using Masuit.Tools;
+using Camille.Core.MiraiBase.Contract;
+using Camille.Core.MiraiBase.Models.BasicMessage;
+using Camille.Imp.Extension;
+using Camille.Imp.MiraiBase.Message;
+using Camille.Imp.MiraiBase.Message.MessageContainer;
 using Meow.Core.Model.Base;
 using Meow.Plugin.NeverStopTalkingPlugin.Models;
-using Meow.Utils;
 
 namespace Meow.Plugin.NeverStopTalkingPlugin.Service;
 
@@ -28,7 +27,7 @@ public class MessageProcess : HostDatabaseSupport
 {
     /// <inheritdoc />
     public MessageProcess(BagOfWordManager bagOfWordManager, TextCutter textCutter,
-        Core.Meow host) : base(host)
+        Core.Meow bot) : base(bot)
     {
         BagOfWordManager = bagOfWordManager;
         BagOfWordManager.BoWBusyStateChange.Subscribe(isBusy => IsBowManagerBusy = isBusy);
@@ -58,7 +57,7 @@ public class MessageProcess : HostDatabaseSupport
     /// <summary>
     /// 触发几率千分数 如果这个值是18 那么触发几率就是 18/1000
     /// </summary>
-    private int TriggerProbabilityPerThousand { get; set; } = 188;
+    private int TriggerProbabilityPerThousand { get; set; } = 600;
 
     /// <summary>
     /// 触发几率随机数获取器
@@ -73,7 +72,7 @@ public class MessageProcess : HostDatabaseSupport
     /// <summary>
     /// 每一时间内只允许同时处理一条消息
     /// </summary>
-    private ConcurrentQueue<MessageChain> ConcurrentQueue { get; set; } = new();
+    private ConcurrentQueue<IMiraiMessageContainer> ConcurrentQueue { get; set; } = new();
 
     #endregion
 
@@ -89,22 +88,31 @@ public class MessageProcess : HostDatabaseSupport
         {
             while (true)
             {
-                await Task.Delay(TimeSpan.FromSeconds(0.5)).ConfigureAwait(false);
-                if (!ConcurrentQueue.TryDequeue(out var messageChain))
+                try
                 {
-                    continue;
-                }
+                    await Task.Delay(TimeSpan.FromSeconds(0.5)).ConfigureAwait(false);
+                    if (!ConcurrentQueue.TryDequeue(out var container))
+                    {
+                        continue;
+                    }
 
-                await Process(messageChain).ConfigureAwait(false);
+                    await Process(container).ConfigureAwait(false);
+                }
+                catch (Exception e)
+                {
+                    Bot.Error($"{nameof(MessageProcess)}出现异常:", e);
+                }
             }
         }
 
-        async Task Process(MessageChain messageChain)
+        async Task Process(IMiraiMessageContainer container)
         {
-            if (IsBowManagerBusy)
+            if (IsBowManagerBusy || container is not MiraiMsgContainerBase msgBase)
             {
                 return;
             }
+
+            var messageChain = msgBase.MessageChain;
 
             // 不处理自身消息, 获取textMessage为空 filterResult为空的清空下 就退出
             if (TextCutter.GetTextMsg(messageChain, out var textMessage, out var filterResult))
@@ -112,28 +120,43 @@ public class MessageProcess : HostDatabaseSupport
                 return;
             }
 
-            var msgRecord = BagOfWordManager.ProcessCutResult(messageChain, textMessage, filterResult);
-            var bagOfWordVector = BagOfWordManager.GetMsgVectors(msgRecord, filterResult);
             // 计算完消息向量, 先保存, 如果获取到了消息向量 就会被表示为拥有消息向量
+            var msgRecord = BagOfWordManager.ProcessCutResult(container, textMessage, filterResult);
             Insert(msgRecord, CollStr.NstMessageProcessMsgRecordCollection);
+            
+            var bagOfWordVector = BagOfWordManager.GetMsgVectors(msgRecord, filterResult);
 
             if (bagOfWordVector.Count < 1)
             {
                 return;
             }
 
-            if (!RepeaterTrigger(bagOfWordVector, messageChain, msgRecord, out var result))
+            if (!RepeaterTrigger(bagOfWordVector, container, msgRecord, out var result))
             {
                 return;
             }
 
             var textMsg = result.repeaterMsg!.TextMsg;
             var message = $"\n源消息: {textMessage}\n相似消息: {textMsg}\n相似度: {result.similarity}";
-            Host.Info(message);
-            // 限制发哪几个群
-            if (messageChain.GroupUin is 749396837 or 726070631 or 587914615)
+            Bot.Info(message);
+
+            long targetId = 0;
+            bool isGroup = false;
+            if (container is FriendMiraiMsgContainer friendMsg)
             {
-                await Host.SendMessage(messageChain.CreateSameTypeTextMessage(textMsg)).ConfigureAwait(false);
+                targetId = friendMsg.Sender.Id;
+            }
+            else if (container is GroupMiraiMsgContainer groupMsg)
+            {
+                targetId = groupMsg.Sender.Group.Id;
+                isGroup = true;
+            }
+
+            // 限制发哪几个群
+            if (targetId is 749396837 or 726070631 or 587914615 || !isGroup)
+            {
+                container.MessageChain = textMsg;
+                await container.SendToAsync(Bot).ConfigureAwait(false);
             }
         }
     }
@@ -141,11 +164,11 @@ public class MessageProcess : HostDatabaseSupport
     /// <summary>
     /// 消息入队
     /// </summary>
-    /// <param name="messageChain">消息链</param>
+    /// <param name="container">消息容器</param>
     /// <returns></returns>
-    public void EnqueueMessage(MessageChain messageChain)
+    public void EnqueueMessage(IMiraiMessageContainer container)
     {
-        ConcurrentQueue.Enqueue(messageChain);
+        ConcurrentQueue.Enqueue(container);
     }
 
     /// <summary>
@@ -154,16 +177,16 @@ public class MessageProcess : HostDatabaseSupport
     /// 但是缺没有找到相似消息, 那下一次就会强制触发, 直到触发了一次为止
     /// </summary>
     /// <param name="allVector">要做匹配的向量集</param>
-    /// <param name="messageChain">源消息链</param>
+    /// <param name="container">源消息容器</param>
     /// <param name="msgRecord">当前消息</param>
     /// <param name="result">触发复读时找到的相似详细</param>
     /// <returns></returns>
-    private bool RepeaterTrigger(List<BagOfWordVector> allVector, MessageChain messageChain, MsgRecord msgRecord,
+    private bool RepeaterTrigger(List<BagOfWordVector> allVector, IMiraiMessageContainer container, MsgRecord msgRecord,
         out (double similarity, MsgRecord? repeaterMsg) result)
     {
         result = (0, null);
 
-        if (!TryToTrigger(msgRecord, messageChain, out var nstTriggerRecord))
+        if (!TryToTrigger(msgRecord, container, out var nstTriggerRecord))
         {
             return false;
         }
@@ -202,13 +225,13 @@ public class MessageProcess : HostDatabaseSupport
     /// 尝试触发操作。
     /// </summary>
     /// <param name="msgRecord">消息记录对象。</param>
-    /// <param name="messageChain"></param>
+    /// <param name="container">消息容器</param>
     /// <param name="nstTriggerRecord">触发记录输出参数。</param>
     /// <returns>如果触发成功，返回 true；否则返回 false。</returns>
     /// <remarks>
     /// 该方法根据消息记录和一定的几率（以及强制触发条件）决定是否触发某一操作。
     /// </remarks>
-    private bool TryToTrigger(MsgRecord msgRecord, MessageChain messageChain,
+    private bool TryToTrigger(MsgRecord msgRecord, IMiraiMessageContainer container,
         [MaybeNullWhen(false)] out NstTriggerRecord nstTriggerRecord)
     {
         // 初始化'强制触发'标志，默认为false
@@ -226,13 +249,6 @@ public class MessageProcess : HostDatabaseSupport
         // 查找与当前消息对应的触发记录
         nstTriggerRecord = TriggerRecords.FirstOrDefault(x => x.Uin == uin && x.BagOfWordType == bagOfWordType);
 
-        // 超过15秒间隔的消息不回复
-        var msgTime = messageChain.Time.Add(TimeSpan.FromHours(8));
-        if (DateTime.Now - msgTime > TimeSpan.FromSeconds(15))
-        {
-            return false;
-        }
-
         // 如果没有找到对应的触发记录，则创建一个新的记录并添加到列表中
         if (nstTriggerRecord is null)
         {
@@ -244,14 +260,15 @@ public class MessageProcess : HostDatabaseSupport
             // 如果触发失败次数大于等于3次，则强制触发
             if (nstTriggerRecord.TriggerFailedCount >= 3)
             {
-                Host.Info($"{nstTriggerRecord.Uin}-{nstTriggerRecord.TriggerFailedCount}: isForceTrigger: true");
+                Bot.Info($"{nstTriggerRecord.Uin}-{nstTriggerRecord.TriggerFailedCount}: isForceTrigger: true");
                 isForceTrigger = true;
             }
 
             // 如果Bot被At则强制触发
-            if (messageChain.Any(x => x is MentionEntity mentionEntity && mentionEntity.Uin == Host.MeowBot.BotUin))
+            if (container is MiraiMsgContainerBase msgBase &&
+                msgBase.MessageChain.Any(x => x is At at && at.Target == Bot.BotQq))
             {
-                Host.Info($"At Bot: isForceTrigger: true");
+                Bot.Info($"At Bot: isForceTrigger: true");
                 isForceTrigger = true;
             }
         }
@@ -259,14 +276,14 @@ public class MessageProcess : HostDatabaseSupport
         // 如果不是强制触发，且随机数大于触发概率阈值，则返回false，表示不触发
         if (!isForceTrigger && randomNum > TriggerProbabilityPerThousand)
         {
-            Host.Info($"return: {randomNum}, {nstTriggerRecord.TriggerFailedCount}");
+            Bot.Info($"trigger value: {randomNum}, threshold: {TriggerProbabilityPerThousand} trigger failed count: {nstTriggerRecord.TriggerFailedCount}");
             return false;
         }
 
         if (nstTriggerRecord.LastTriggered is not null &&
-            (DateTime.Now - nstTriggerRecord.LastTriggered) < TimeSpan.FromMinutes(1))
+            (DateTime.Now - nstTriggerRecord.LastTriggered) < TimeSpan.FromSeconds(10))
         {
-            Host.Info($"触发间隔限制: {nstTriggerRecord.LastTriggered} now: {DateTime.Now}");
+            Bot.Info($"触发间隔限制: {nstTriggerRecord.LastTriggered} now: {DateTime.Now}");
             return false;
         }
 
@@ -279,10 +296,10 @@ public class MessageProcess : HostDatabaseSupport
     /// </summary>
     /// <param name="bagOfWordVectors">需要对比哪些向量</param>
     /// <param name="threshold">最低相似度</param>
-    private List<(double similarity, int msgId)> FindMostSimilarMsg(List<BagOfWordVector> bagOfWordVectors,
+    private List<(double similarity, long msgId)> FindMostSimilarMsg(List<BagOfWordVector> bagOfWordVectors,
         double threshold)
     {
-        var totalResult = new List<(double similarity, int msgId)>();
+        var totalResult = new List<(double similarity, long msgId)>();
         var startTime = DateTime.Now;
         foreach (var bagOfWordVector in bagOfWordVectors)
         {
@@ -294,7 +311,7 @@ public class MessageProcess : HostDatabaseSupport
         }
 
         var endTime = DateTime.Now;
-        Host.Info($"SimilarMsg Calculation: Start{startTime}, endTime: {endTime}");
+        Bot.Info($"SimilarMsg Calculation: Start{startTime}, endTime: {endTime}");
 
         // 去重
         return totalResult
@@ -323,7 +340,7 @@ public class MessageProcess : HostDatabaseSupport
             if (msgRecord.HaveVector)
             {
                 Update(msgRecord, CollStr.NstMessageProcessMsgRecordCollection);
-                Host.Info("Updated message vector.");
+                Bot.Info("Updated message vector.");
             }
         }
     }

@@ -1,5 +1,4 @@
 ﻿using System.Windows.Controls;
-using Meow.Core.Model.Base;
 using Meow.UI.ViewModels;
 
 namespace Meow.UI.Views;

@@ -1,5 +1,5 @@
-﻿using System.Reactive.Linq;
-using Lagrange.Core.Message;
+﻿using Camille.Core.MiraiBase.Models.Base;
+using Camille.Imp.MiraiBase.Message;
 using Meow.Core;
 using Meow.Core.Model.Base;
 using Meow.Plugin.NeverStopTalkingPlugin.Models;
@@ -14,7 +14,7 @@ namespace Meow.Plugin.NeverStopTalkingPlugin.Command;
 public class BagOfWordCommand : HostDatabaseSupport, IMeowCommand
 {
     /// <inheritdoc />
-    public BagOfWordCommand(Core.Meow host, BagOfWordManager bagOfWordManager) : base(host)
+    public BagOfWordCommand(Core.Meow bot, BagOfWordManager bagOfWordManager) : base(bot)
     {
         BagOfWordManager = bagOfWordManager;
     }
@@ -45,12 +45,12 @@ public class BagOfWordCommand : HostDatabaseSupport, IMeowCommand
                                              示例{CommandTrigger} query [Group|Personal|Global] 目标[群号|qq|Global的话这里为0]  
                                              >> 查询[目标群|个人|全局]的词袋状态
                                              >> 输出: 词袋id 词袋类型 词袋大小 词袋生成的向量个数 创建时间 是否被删除 状态：填充数量/最大数量 
-                                             
+
                                              词袋编辑相关(耗时操作)>
                                              示例{CommandTrigger} msg [Group|Personal|Global] 目标[群号|qq|Global的话这里为0] 
                                              >> 查询[目标群|个人|全局]所有信息可以构建什么大小的词袋
                                              >> 输出: 目标类型 目标ID 总计消息数量 可构建词袋大小 
-                                             
+
                                              示例{CommandTrigger} rebuild [Group|Personal|Global] 目标[群号|qq|Global的话这里为0] 词袋大小
                                              >> 重新构建目标的词袋为指定大小的词袋, 如果词袋构建完之后是满的则重新计算所有相关消息向量
                                              >> 输出: 目标类型 目标ID 构建后状态 重新计算消息向量数量 
@@ -62,9 +62,10 @@ public class BagOfWordCommand : HostDatabaseSupport, IMeowCommand
 
     /// <inheritdoc />
     public async Task<(bool needSendMessage, MessageChain messageChain)> RunCommand(Core.Meow meow,
-        MessageChain messageChain,
+        MiraiMsgContainerBase container,
         string? args)
     {
+        var messageChain = container.MessageChain;
         var success = new CommandArgsCheckUtil(messageChain, args)
             .SplitArgsAndCheckLength(' ', 4, new Range(1, 4), "参数数量错误, 请检查参数格式")
             .ArgListMatch(0, ["add", "remove", "query", "msg", "rebuild"])
@@ -81,12 +82,12 @@ public class BagOfWordCommand : HostDatabaseSupport, IMeowCommand
         var targetTypeStr = splitResult[1];
         if (!targetTypeStr.TryConvertToEnum<BagOfWordType>(out var type))
         {
-            return (true, messageChain.CreateSameTypeTextMessage($"错误的目标类型: {targetTypeStr}"));
+            return (true, $"错误的目标类型: {targetTypeStr}");
         }
 
-        if (!uint.TryParse(splitResult[2], out var target))
+        if (!long.TryParse(splitResult[2], out var target))
         {
-            return (true, messageChain.CreateSameTypeTextMessage($"无法正常解析的uin: {splitResult[3]}"));
+            return (true, $"无法正常解析的uin: {splitResult[2]}");
         }
 
         return action switch
@@ -96,28 +97,29 @@ public class BagOfWordCommand : HostDatabaseSupport, IMeowCommand
             "query" => (true, Query(messageChain, type, target)),
             "msg" => (true, await Msg(messageChain, type, target).ConfigureAwait(false)),
             "rebuild" => (true, await Rebuild(messageChain, type, target).ConfigureAwait(false)),
-            _ => (true, messageChain.CreateSameTypeTextMessage("参数异常"))
+            _ => (true, "参数异常")
         };
     }
 
-    private async Task<MessageChain> Msg(MessageChain messageChain, BagOfWordType type, uint target)
+    private async Task<MessageChain> Msg(MessageChain messageChain, BagOfWordType type, long target)
     {
-        var queryMsgCutBagOfWordCount = await BagOfWordManager.QueryMsgCutBagOfWordCount(type, target).ConfigureAwait(false);
-        return messageChain.CreateSameTypeTextMessage(queryMsgCutBagOfWordCount);
+        var queryMsgCutBagOfWordCount =
+            await BagOfWordManager.QueryMsgCutBagOfWordCount(type, target).ConfigureAwait(false);
+        return queryMsgCutBagOfWordCount;
     }
 
-    private async Task<MessageChain> Rebuild(MessageChain messageChain, BagOfWordType result, uint target)
+    private async Task<MessageChain> Rebuild(MessageChain messageChain, BagOfWordType result, long target)
     {
         BagOfWordManager.BoWBusyStateChange.OnNext(true);
         var rebuildBagOfWord = await BagOfWordManager.RebuildBagOfWord(result, target).ConfigureAwait(false);
         BagOfWordManager.BoWBusyStateChange.OnNext(false);
-        return messageChain.CreateSameTypeTextMessage(rebuildBagOfWord);
+        return rebuildBagOfWord;
     }
 
     /// <summary>
     /// 添加词袋
     /// </summary>
-    private MessageChain Add(MessageChain messageChain, BagOfWordType targetType, uint target)
+    private MessageChain Add(MessageChain messageChain, BagOfWordType targetType, long target)
     {
         switch (targetType)
         {
@@ -125,8 +127,8 @@ public class BagOfWordCommand : HostDatabaseSupport, IMeowCommand
             {
                 var success = BagOfWordManager.CreateBagOfWord(target, BagOfWordType.Group, out var errorMsg);
                 return success
-                    ? messageChain.CreateSameTypeTextMessage($"成功创建[Group:{target}]词袋")
-                    : messageChain.CreateSameTypeTextMessage(errorMsg);
+                    ? $"成功创建[Group:{target}]词袋"
+                    : errorMsg;
             }
             case BagOfWordType.Personal:
             {
@@ -134,25 +136,25 @@ public class BagOfWordCommand : HostDatabaseSupport, IMeowCommand
                     BagOfWordType.Personal,
                     out var errorMsg);
                 return success
-                    ? messageChain.CreateSameTypeTextMessage($"成功创建[Personal:{target}]词袋")
-                    : messageChain.CreateSameTypeTextMessage(errorMsg);
+                    ? $"成功创建[Personal:{target}]词袋"
+                    : errorMsg;
             }
             case BagOfWordType.Global:
             {
                 var isSuccess = BagOfWordManager.CreateBagOfWord(target, BagOfWordType.Global, out var errorMsg);
                 return isSuccess
-                    ? messageChain.CreateSameTypeTextMessage($"成功创建[Global]词袋")
-                    : messageChain.CreateSameTypeTextMessage(errorMsg);
+                    ? "成功创建[Global]词袋"
+                    : errorMsg;
             }
             default:
-                return messageChain.CreateSameTypeTextMessage("参数异常");
+                return "参数异常";
         }
     }
 
     /// <summary>
     /// 查询词袋
     /// </summary>
-    private MessageChain Query(MessageChain messageChain, BagOfWordType targetType, uint target)
+    private MessageChain Query(MessageChain messageChain, BagOfWordType targetType, long target)
     {
         var msg = "词袋查询执行异常";
         switch (targetType)
@@ -179,35 +181,34 @@ public class BagOfWordCommand : HostDatabaseSupport, IMeowCommand
                 break;
         }
 
-        return messageChain.CreateSameTypeTextMessage(msg);
+        return msg;
     }
 
     /// <summary>
     /// 移除
     /// </summary>
-    private MessageChain Remove(MessageChain messageChain, BagOfWordType targetType, uint target)
+    private MessageChain Remove(MessageChain messageChain, BagOfWordType targetType, long target)
     {
         switch (targetType)
         {
-        
             case BagOfWordType.Group:
             {
                 var success = BagOfWordManager.RemoveBagOfWord(target, BagOfWordType.Group);
                 return success
-                    ? messageChain.CreateSameTypeTextMessage($"成功移除[Group:{target}]词袋")
-                    : messageChain.CreateSameTypeTextMessage("移除失败");
+                    ? $"成功移除[Group:{target}]词袋"
+                    : "移除失败";
             }
             case BagOfWordType.Personal:
             {
                 var success = BagOfWordManager.RemoveBagOfWord(target, BagOfWordType.Personal);
                 return success
-                    ? messageChain.CreateSameTypeTextMessage($"成功移除[Personal:{target}]词袋")
-                    : messageChain.CreateSameTypeTextMessage("移除失败");
+                    ? $"成功移除[Personal:{target}]词袋"
+                    : "移除失败";
             }
             case BagOfWordType.Global:
-                return messageChain.CreateSameTypeTextMessage("全局词袋无法移除");
+                return "全局词袋无法移除";
             default:
-                return messageChain.CreateSameTypeTextMessage("参数异常");
+                return "参数异常";
         }
     }
 }

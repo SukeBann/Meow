@@ -9,7 +9,7 @@ namespace Meow.Plugin.NeverStopTalkingPlugin.Service;
 public class ForbiddenWordsManager : HostDatabaseSupport
 {
     /// <inheritdoc />
-    public ForbiddenWordsManager(Meow.Core.Meow host) : base(host)
+    public ForbiddenWordsManager(Meow.Core.Meow bot) : base(bot)
     {
         ForbiddenWordsFilter = [];
         LoadForbiddenWordFromDb();
@@ -39,7 +39,7 @@ public class ForbiddenWordsManager : HostDatabaseSupport
             ForbiddenWordsFilter.Add(forbiddenWordRecord);
         }
 
-        Host.Info($"添加违禁词成功, 总共添加了{forbiddenWordRecords.Count}个");
+        Bot.Info($"添加违禁词成功, 总共添加了{forbiddenWordRecords.Count}个");
     }
 
     /// <summary>
@@ -56,8 +56,8 @@ public class ForbiddenWordsManager : HostDatabaseSupport
     /// 添加违禁词
     /// </summary>
     /// <param name="word"></param>
-    /// <param name="sender"></param>
-    public void AddForbiddenWord(string word, uint sender)
+    /// <param name="senderId"></param>
+    public void AddForbiddenWord(string word, long senderId)
     {
         var record = Query<ForbiddenWordRecord>(CollStr.NstForbiddenWordsManagerCollection)
             .Where(x => x.ForbiddenWord == word)
@@ -76,7 +76,7 @@ public class ForbiddenWordsManager : HostDatabaseSupport
         }
         else
         {
-            record = new ForbiddenWordRecord(sender, word);
+            record = new ForbiddenWordRecord(senderId, word);
             Insert(record, CollStr.NstForbiddenWordsManagerCollection);
         }
 

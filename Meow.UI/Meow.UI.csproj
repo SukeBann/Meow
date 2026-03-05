@@ -9,28 +9,28 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\Meow\Meow.csproj" />
+        <ProjectReference Include="..\Meow\Meow.csproj"/>
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="Panuon.WPF.UI" Version="1.2.2.1" />
-      <PackageReference Include="PropertyChanged.Fody" Version="4.1.0" />
-      <PackageReference Include="Serilog.Sinks.RichTextBox.Wpf" Version="1.1.0" />
+        <PackageReference Include="Panuon.WPF.UI" Version="1.2.2.1"/>
+        <PackageReference Include="PropertyChanged.Fody" Version="4.1.0"/>
+        <PackageReference Include="Serilog.Sinks.RichTextBox.Wpf" Version="1.1.0"/>
     </ItemGroup>
 
     <ItemGroup>
-      <None Remove="Style\Resource\Font\MapleMono-SC-NF-Regular.ttf" />
-      <Resource Include="Style\Resource\Font\MapleMono-SC-NF-Regular.ttf">
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      </Resource>
-      <None Remove="Style\Resource\Font\MeowIconFont.ttf" />
-      <Resource Include="Style\Resource\Font\MeowIconFont.ttf">
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      </Resource>
-      <None Remove="Style\Resource\Font\MeowIconFont.json" />
-      <Resource Include="Style\Resource\Font\MeowIconFont.json">
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      </Resource>
+        <None Remove="Style\Resource\Font\MapleMono-SC-NF-Regular.ttf"/>
+        <Resource Include="Style\Resource\Font\MapleMono-SC-NF-Regular.ttf">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Resource>
+        <None Remove="Style\Resource\Font\MeowIconFont.ttf"/>
+        <Resource Include="Style\Resource\Font\MeowIconFont.ttf">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Resource>
+        <None Remove="Style\Resource\Font\MeowIconFont.json"/>
+        <Resource Include="Style\Resource\Font\MeowIconFont.json">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Resource>
     </ItemGroup>
 
 </Project>

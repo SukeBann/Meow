@@ -62,9 +62,9 @@ public class NeverStopTalkingPlugin : PluginBase
         Commands.Add(new BagOfWordCommand(host, nstBagOfWordManager));
         
         MessageProcess = new MessageProcess(nstBagOfWordManager, textCutter, host);
-        MessageProcessDisposable = host.OnMessageReceived.Subscribe(x =>
+        MessageProcessDisposable = host.OnMiraiMessageReceived.Subscribe(x =>
         {
-            MessageProcess.EnqueueMessage(x.messageChain);
+            MessageProcess.EnqueueMessage(x);
         });
         
         base.InjectPlugin(host);
@@ -75,11 +75,5 @@ public class NeverStopTalkingPlugin : PluginBase
     {
         MessageProcessDisposable?.Dispose();
         base.Remove();
-    }
-
-    private void GetConfigPath(Core.Meow host)
-    {
-        var configDir = Path.Combine(host.WorkFolder, nameof(NeverStopTalkingPlugin));
-        //TODO var hostWorkFolder = ;
     }
 }
