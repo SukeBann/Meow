@@ -1,5 +1,6 @@
 ﻿using FreeSql;
 using Meow.Core.Model.Base;
+using Meow.Plugin.OllamaChatPlugin.Models;
 using Serilog;
 
 namespace Meow.Utils;
@@ -25,9 +26,10 @@ public class MeowDatabase
         // 注册 JSON 序列化
         FreeSql.Aop.ConfigEntityProperty += (s, e) =>
         {
-            if (e.Property.PropertyType.IsGenericType && 
-                (e.Property.PropertyType.GetGenericTypeDefinition() == typeof(Dictionary<,>) || 
-                 e.Property.PropertyType.GetGenericTypeDefinition() == typeof(List<>)))
+            if ((e.Property.PropertyType.IsGenericType && 
+                 (e.Property.PropertyType.GetGenericTypeDefinition() == typeof(Dictionary<,>) || 
+                  e.Property.PropertyType.GetGenericTypeDefinition() == typeof(List<>))) ||
+                e.Property.PropertyType == typeof(OllamaSummaryResponse))
             {
                 e.ModifyResult.StringLength = -1;
                 e.ModifyResult.IsIgnore = false;

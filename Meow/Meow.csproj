@@ -27,6 +27,15 @@
         <Content Include="PluginResource\NeverStopTalkingPlugin\停用词.txt">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </Content>
+        <None Update="PluginResource\OllamaChatPlugin\summary_prompt.txt">
+          <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+        <None Update="PluginResource\OllamaChatPlugin\system_prompt.txt">
+          <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+        <None Update="PluginResource\OllamaChatPlugin\system_supplement_prompt.txt">
+          <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
     </ItemGroup>
 
     <ItemGroup>

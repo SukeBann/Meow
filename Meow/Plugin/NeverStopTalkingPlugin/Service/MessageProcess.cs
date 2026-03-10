@@ -27,11 +27,12 @@ public class MessageProcess : HostDatabaseSupport
 {
     /// <inheritdoc />
     public MessageProcess(BagOfWordManager bagOfWordManager, TextCutter textCutter,
-        Core.Meow bot) : base(bot)
+        Core.Meow bot, NstConfig config) : base(bot)
     {
         BagOfWordManager = bagOfWordManager;
         BagOfWordManager.BoWBusyStateChange.Subscribe(isBusy => IsBowManagerBusy = isBusy);
         TextCutter = textCutter;
+        _config = config;
 
         Task.Run(ProcessMessageVector);
         StartProcessTask();
@@ -54,10 +55,7 @@ public class MessageProcess : HostDatabaseSupport
     /// </summary>
     private TextCutter TextCutter { get; set; }
 
-    /// <summary>
-    /// 触发几率千分数 如果这个值是18 那么触发几率就是 18/1000
-    /// </summary>
-    private int TriggerProbabilityPerThousand { get; set; } = 600;
+    private readonly NstConfig _config;
 
     /// <summary>
     /// 触发几率随机数获取器
@@ -126,7 +124,7 @@ public class MessageProcess : HostDatabaseSupport
             
             var bagOfWordVector = BagOfWordManager.GetMsgVectors(msgRecord, filterResult);
 
-            if (bagOfWordVector.Count < 1)
+            if (bagOfWordVector.Count < 1 || !_config.CanSpeak)
             {
                 return;
             }
@@ -274,14 +272,14 @@ public class MessageProcess : HostDatabaseSupport
         }
 
         // 如果不是强制触发，且随机数大于触发概率阈值，则返回false，表示不触发
-        if (!isForceTrigger && randomNum > TriggerProbabilityPerThousand)
+        if (!isForceTrigger && randomNum > _config.TriggerProbability)
         {
-            Bot.Info($"trigger value: {randomNum}, threshold: {TriggerProbabilityPerThousand} trigger failed count: {nstTriggerRecord.TriggerFailedCount}");
+            Bot.Info($"trigger value: {randomNum}, threshold: {_config.TriggerProbability} trigger failed count: {nstTriggerRecord.TriggerFailedCount}");
             return false;
         }
 
         if (nstTriggerRecord.LastTriggered is not null &&
-            (DateTime.Now - nstTriggerRecord.LastTriggered) < TimeSpan.FromSeconds(10))
+            (DateTime.Now - nstTriggerRecord.LastTriggered) < TimeSpan.FromSeconds(_config.CooldownSeconds))
         {
             Bot.Info($"触发间隔限制: {nstTriggerRecord.LastTriggered} now: {DateTime.Now}");
             return false;

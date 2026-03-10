@@ -44,13 +44,57 @@ public class OllamaApiService
             }
 
             var responseJson = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-            var result = JObject.Parse(responseJson);
-            return result["message"]?["content"]?.ToString();
+            return ParseChatResponse(responseJson);
         }
         catch (Exception e)
         {
             _bot.Error("Exception while calling Ollama API", e);
             return null;
+        }
+    }
+
+    private string? ParseChatResponse(string responseJson)
+    {
+        if (string.IsNullOrWhiteSpace(responseJson))
+        {
+            return null;
+        }
+
+        try
+        {
+            var result = JObject.Parse(responseJson);
+            return result["message"]?["content"]?.ToString();
+        }
+        catch (JsonReaderException)
+        {
+            var sb = new StringBuilder();
+            var lines = responseJson
+                .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+
+            foreach (var line in lines)
+            {
+                try
+                {
+                    var chunk = JObject.Parse(line);
+                    var content = chunk["message"]?["content"]?.ToString();
+
+                    if (!string.IsNullOrEmpty(content))
+                    {
+                        sb.Append(content);
+                    }
+
+                    if (chunk["done"]?.Value<bool>() == true)
+                    {
+                        break;
+                    }
+                }
+                catch (JsonReaderException ex)
+                {
+                    _bot.Error($"Failed to parse Ollama response chunk: {line}", ex);
+                }
+            }
+
+            return sb.Length > 0 ? sb.ToString() : null;
         }
     }
 }

@@ -1,7 +1,10 @@
 ﻿using Meow.Core;
 using Meow.Core.Model.Base;
 using Meow.Plugin.NeverStopTalkingPlugin.Command;
+using Meow.Plugin.NeverStopTalkingPlugin.Models;
 using Meow.Plugin.NeverStopTalkingPlugin.Service;
+using Newtonsoft.Json;
+using System.IO;
 
 namespace Meow.Plugin.NeverStopTalkingPlugin;
 
@@ -41,6 +44,50 @@ public class NeverStopTalkingPlugin : PluginBase
     /// <inheritdoc />
     public override string PluginUid => "8E1F9C63-CB6C-4232-B617-09DAA73F8910";
 
+    private string _configPath = string.Empty;
+    private NstConfig _config = new();
+
+    private void LoadConfig()
+    {
+        try
+        {
+            if (File.Exists(_configPath))
+            {
+                var json = File.ReadAllText(_configPath);
+                _config = JsonConvert.DeserializeObject<NstConfig>(json) ?? new NstConfig();
+            }
+            else
+            {
+                _config = new NstConfig();
+                SaveConfig();
+            }
+        }
+        catch (Exception e)
+        {
+            _config = new NstConfig();
+            Bot?.Error("Failed to load NeverStopTalkingPlugin config", e);
+        }
+    }
+
+    private void SaveConfig()
+    {
+        try
+        {
+            var dir = Path.GetDirectoryName(_configPath);
+            if (!Directory.Exists(dir))
+            {
+                Directory.CreateDirectory(dir!);
+            }
+
+            var json = JsonConvert.SerializeObject(_config, Formatting.Indented);
+            File.WriteAllText(_configPath, json);
+        }
+        catch (Exception e)
+        {
+            Bot?.Error("Failed to save NeverStopTalkingPlugin config", e);
+        }
+    }
+
     /// <summary>
     /// 消息处理器
     /// </summary>
@@ -54,14 +101,18 @@ public class NeverStopTalkingPlugin : PluginBase
     /// <inheritdoc />
     public override void InjectPlugin(Core.Meow host)
     {
+        _configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "PluginResource", "NeverStopTalkingPlugin", "nst_config.json");
+        LoadConfig();
+
         var forbiddenWordsManager = new ForbiddenWordsManager(host);
         var textCutter = new TextCutter(host, forbiddenWordsManager);
         var nstBagOfWordManager = new BagOfWordManager(host, textCutter);
 
         Commands.Add(new NstDontSayThatCommand(forbiddenWordsManager));
         Commands.Add(new BagOfWordCommand(host, nstBagOfWordManager));
+        Commands.Add(new NstConfigCommand(_config, SaveConfig));
         
-        MessageProcess = new MessageProcess(nstBagOfWordManager, textCutter, host);
+        MessageProcess = new MessageProcess(nstBagOfWordManager, textCutter, host, _config);
         MessageProcessDisposable = host.OnMiraiMessageReceived.Subscribe(x =>
         {
             MessageProcess.EnqueueMessage(x);
