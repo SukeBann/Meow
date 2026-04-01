@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations.Schema;
+﻿using FreeSql.DataAnnotations;
 using Meow.Core.Model.Base;
 
 namespace Meow.Plugin.NeverStopTalkingPlugin.Models;
@@ -25,6 +25,7 @@ public class MsgRecord : DatabaseRecordBase
     /// <summary>
     /// 纯文本消息
     /// </summary>
+    [Column(DbType = "longtext")]
     public string TextMsg { get; set; }
 
     /// <summary>

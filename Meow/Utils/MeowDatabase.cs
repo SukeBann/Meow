@@ -7,7 +7,7 @@ namespace Meow.Utils;
 
 public class MeowDatabase
 {
-    public MeowDatabase(string folderPath, string databaseName, ILogger logger)
+    public MeowDatabase(string folderPath, string databaseName, ILogger logger, string databaseType = "Sqlite", string? connectionString = null)
     {
         if (!Directory.Exists(folderPath))
         {
@@ -17,9 +17,27 @@ public class MeowDatabase
         var path = Path.Combine(folderPath, $"{databaseName}.db");
         DatabaseName = databaseName;
         Logger = logger;
+
+        if (Logger != null)
+        {
+            Logger.Information("数据库初始化中:{DatabaseName}, Type:{DatabaseType}", databaseName, databaseType);
+        }
+
+        var dataType = databaseType.ToLower() switch
+        {
+            "sqlite" => DataType.Sqlite,
+            "mysql" => DataType.MySql,
+            _ => DataType.Sqlite
+        };
+
+        var finalConnectionString = connectionString;
+        if (dataType == DataType.Sqlite && string.IsNullOrEmpty(finalConnectionString))
+        {
+            finalConnectionString = $"Data Source={path}";
+        }
         
         FreeSql = new FreeSqlBuilder()
-            .UseConnectionString(DataType.Sqlite, $"Data Source={path}")
+            .UseConnectionString(dataType, finalConnectionString)
             .UseAutoSyncStructure(true)
             .Build();
 
@@ -36,12 +54,17 @@ public class MeowDatabase
             }
         };
 
-        logger.Information("数据库加载完毕:{DatabaseName}, Path:{Path}", databaseName, path);
+        logger?.Information("数据库加载完毕:{DatabaseName}, Type:{DatabaseType}, ConnectionString:{ConnectionString}", databaseName, dataType, finalConnectionString);
     }
 
     public IFreeSql FreeSql { get; private set; }
 
-    private ILogger Logger { get; set; }
+    private ILogger? Logger { get; set; }
+
+    public void SetLogger(ILogger logger)
+    {
+        Logger = logger;
+    }
 
     /// <summary>
     /// 数据库名称

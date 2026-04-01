@@ -59,7 +59,7 @@ public class BagOfWordVector : DatabaseRecordBase
     /// <summary>
     /// 向量中有技术的索引位置 以及命中次数, 用于结合向量长度生成向量, 节约存储和查询成本
     /// </summary>
-    [Column(StringLength = -1)]
+    [Column(DbType = "longtext")]
     public string VectorElementIndexJson
     {
         get => JsonConvert.SerializeObject(VectorElementIndex);

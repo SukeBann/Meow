@@ -18,7 +18,9 @@ public class MeowConfig : IMiraiBotConfig
         char commandArgsSeparator,
         long botQq,
         string verifyKey,
-        string host)
+        string host,
+        string databaseType = "Sqlite",
+        string? dbConnectionString = null)
     {
         BotWorkDir = botWorkDir;
         BotName = botName;
@@ -27,11 +29,23 @@ public class MeowConfig : IMiraiBotConfig
         BotQq = botQq;
         VerifyKey = verifyKey;
         Host = host;
+        DatabaseType = databaseType;
+        DbConnectionString = dbConnectionString;
         
         // 默认初始化
         ReceiveAdapterServerAddress = host;
         ApiAdapterServerAddress = host;
     }
+
+    /// <summary>
+    /// 数据库类型 (Sqlite, MySql)
+    /// </summary>
+    public string DatabaseType { get; set; }
+
+    /// <summary>
+    /// 数据库连接字符串 (如果是 MySql 则需要)
+    /// </summary>
+    public string? DbConnectionString { get; set; }
 
     /// <summary>
     /// 获取或设置 Bot 工作目录

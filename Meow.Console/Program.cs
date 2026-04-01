@@ -23,7 +23,7 @@ internal class Program
             littleTang.LoadPlugin(helpPlugin);
             littleTang.LoadPlugin(new ConsolePrintMessagePlugin());
             littleTang.LoadPlugin(new PermissionPlugin());
-            littleTang.LoadPlugin(new NeverStopTalkingPlugin());
+            // littleTang.LoadPlugin(new NeverStopTalkingPlugin());
             littleTang.LoadPlugin(new OllamaChatPlugin());
 
             await littleTang.Login().ConfigureAwait(false);

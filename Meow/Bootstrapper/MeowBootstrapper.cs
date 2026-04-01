@@ -6,6 +6,7 @@ using Meow.Config;
 using Meow.Utils;
 using Newtonsoft.Json;
 using Serilog;
+using Meow.Core;
 
 namespace Meow.Bootstrapper;
 
@@ -42,6 +43,8 @@ public class MeowBootstrapper
     /// </summary>
     private static bool IsInit { get; set; }
 
+    private static ContainerBuilder? _builder;
+
     /// <summary>
     /// 初始化
     /// </summary>
@@ -53,8 +56,9 @@ public class MeowBootstrapper
             throw new InvalidOperationException($"请不要重复初始化{nameof(MeowBootstrapper)}");
         }
 
-        ConfigurationServices();
-        var meowBootstrapper = new MeowBootstrapper(Ioc.GetService<ILogger>());
+        _builder = new ContainerBuilder();
+        ConfigurationServices(_builder);
+        var meowBootstrapper = new MeowBootstrapper(null!); // 暂时传null，加载配置后再初始化
         IsInit = true;
         return meowBootstrapper;
     }
@@ -62,21 +66,14 @@ public class MeowBootstrapper
     /// <summary>
     /// 配置IOC
     /// </summary>
-    private static void ConfigurationServices()
+    private static void ConfigurationServices(ContainerBuilder builder)
     {
-        ContainerBuilder builder = new();
-
         var currentDomainBaseDirectory = StaticValue.AppCurrentPath;
         var logger = LoggerCreator.GenerateLoggerConfig(currentDomainBaseDirectory)
             .CreateLogger();
         LoggerCreator.SyncToCamille(logger);
         logger.Information("全局日志模块加载完毕");
         builder.RegisterInstance(logger).As<ILogger>().SingleInstance();
-
-        var meowDatabase = new MeowDatabase(currentDomainBaseDirectory, "MeowDb", logger);
-        builder.RegisterInstance(meowDatabase).As<MeowDatabase>().SingleInstance();
-
-        Ioc.Container = builder.Build();
     }
 
     #endregion
@@ -97,7 +94,19 @@ public class MeowBootstrapper
             Directory.CreateDirectory(WorkDir);
         }
 
+        // 构建 IOC 容器
+        if (_builder != null)
+        {
+            var meowDatabase = new MeowDatabase(WorkDir, config.BotName, null!, config.DatabaseType, config.DbConnectionString);
+            _builder.RegisterInstance(meowDatabase).As<MeowDatabase>().SingleInstance();
+            Ioc.Container = _builder.Build();
+            Log = Ioc.GetService<ILogger>()!;
+            meowDatabase.SetLogger(Log); // 设置数据库的日志记录器
+            _builder = null; // 释放 builder
+        }
+
         Log.Information("Meow:[{MeowName}]将在此路径中工作: {WorkDir}", config.BotName, WorkDir);
+
         Meow = new Core.Meow(config, WorkDir);
 
         return this;

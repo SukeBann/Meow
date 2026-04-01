@@ -102,8 +102,14 @@ public class OllamaApiService
 public class OllamaMessage
 {
     [JsonProperty("role")]
-    public string Role { get; set; }
+    public string Role { get; set; } = string.Empty;
 
     [JsonProperty("content")]
-    public string Content { get; set; }
+    public string Content { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 消息产生或接收时间 (UTC)
+    /// </summary>
+    [JsonProperty("timestamp")]
+    public DateTime Timestamp { get; set; } = DateTime.UtcNow;
 }

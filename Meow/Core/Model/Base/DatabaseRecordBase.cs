@@ -18,7 +18,6 @@ public abstract class DatabaseRecordBase
     /// </summary>
     public bool HasDelete { get; set; }
 
-
     /// <summary>
     /// 创建时间
     /// </summary>

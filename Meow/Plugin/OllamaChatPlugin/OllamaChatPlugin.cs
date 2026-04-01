@@ -50,6 +50,33 @@ public class OllamaChatPlugin : PluginBase
 
     private readonly CancellationTokenSource _cts = new();
 
+    public void ClearContext(long uin, bool clearChat = true, bool clearSummary = true)
+    {
+        if (clearChat)
+        {
+            _context.TryRemove(uin, out _);
+            _messageCounter.TryRemove(uin, out _);
+            _lastReplyTime.TryRemove(uin, out _);
+            _isSummaryRunning.TryRemove(uin, out _);
+            _locks.TryRemove(uin, out _);
+
+            if (Bot != null)
+            {
+                Bot.Database.FreeSql.Delete<OllamaChatContext>().Where(x => x.Uin == uin).ExecuteAffrows();
+            }
+        }
+
+        if (clearSummary)
+        {
+            _summaryCache.TryRemove(uin, out _);
+
+            if (Bot != null)
+            {
+                Bot.Database.FreeSql.Delete<OllamaGroupSummary>().Where(x => x.Uin == uin).ExecuteAffrows();
+            }
+        }
+    }
+
     public OllamaChatPlugin()
     {
         _configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "PluginResource", "OllamaChatPlugin",
@@ -93,7 +120,7 @@ public class OllamaChatPlugin : PluginBase
         {
             _config.SystemPrompt = System.IO.File.ReadAllText(systemPromptPath);
         }
-        
+
         if (System.IO.File.Exists(systemSupplementPrompts))
         {
             _config.SystemPrompt = _config.SystemPrompt + "\n" + System.IO.File.ReadAllText(systemSupplementPrompts);
@@ -191,6 +218,7 @@ public class OllamaChatPlugin : PluginBase
     public override void InjectPlugin(Core.Meow host)
     {
         Commands.Add(new OllamaConfigCommand(_config, SaveConfig, UpdateRoleSetting));
+        Commands.Add(new OllamaClearCommand(ClearContext));
         base.InjectPlugin(host);
         _apiService = new OllamaApiService(host, _config);
 
@@ -201,6 +229,11 @@ public class OllamaChatPlugin : PluginBase
         {
             try
             {
+                if (host.IsCommandMsg(x.MessageChain))
+                {
+                    return;
+                }
+
                 await HandleMessage(x).ConfigureAwait(false);
             }
             catch (Exception e)
@@ -221,11 +254,9 @@ public class OllamaChatPlugin : PluginBase
         // 忽略 Bot 自己的消息
         if (container is MiraiMsgContainerBase baseContainer && baseContainer.Sender?.Id == Bot.BotQq) return;
 
-        var uin = (long)0;
+        var uin = (long) 0;
         var isGroup = false;
 
-        var shouldTrigger = container is FriendMiraiMsgContainer || container.MessageChain.Any(x => x is At at && at.Target == Bot.BotQq);
-        const string role = "user";
         var userName = "unknownUser";
         switch (container)
         {
@@ -241,6 +272,32 @@ public class OllamaChatPlugin : PluginBase
         }
 
         if (uin == 0) return;
+
+        var roll = _random.Next(0, 1000);
+        var shouldTrigger = roll < _config.TriggerProbability;
+        var triggerReason = $"随机数 {roll} < 概率 {_config.TriggerProbability}";
+
+        var isForced = false;
+        if (!shouldTrigger)
+        {
+            var isFriend = container is FriendMiraiMsgContainer;
+            var isAt = container.MessageChain.Any(x => x is At at && at.Target == Bot.BotQq);
+
+            if (isFriend || isAt)
+            {
+                shouldTrigger = true;
+                isForced = true;
+                triggerReason = isFriend ? "私聊强制触发" : "被 @ 强制触发";
+            }
+            else
+            {
+                triggerReason = $"随机数 {roll} >= 概率 {_config.TriggerProbability}，未触发";
+            }
+        }
+
+        Bot?.Debug($"[{uin}] 初始触发检查: shouldTrigger={shouldTrigger}, 原因: {triggerReason}");
+
+        const string role = "user";
 
         // 白名单检查
         if (isGroup)
@@ -260,18 +317,6 @@ public class OllamaChatPlugin : PluginBase
             text = textMsg,
             is_user_input = true // 标记为用户输入，防止 Prompt Injection
         });
-
-        // 检查概率
-        if (shouldTrigger && _summaryCache.TryGetValue(uin, out var summary))
-        {
-            if (summary.GroupChatStatus is {SuggestSpeech: false, SpeechNecessity: "低"})
-            {
-                if (_random.Next(0, 100) >= 10)
-                {
-                    shouldTrigger = false;
-                }
-            }
-        }
 
         // 更新消息计数并检查是否需要总结
         var count = _messageCounter.AddOrUpdate(uin, 1, (_, c) => c + 1);
@@ -298,13 +343,34 @@ public class OllamaChatPlugin : PluginBase
             }
         }
 
+        // 检查概率
+        if (shouldTrigger && _summaryCache.TryGetValue(uin, out var summary))
+        {
+            if (summary.GroupChatStatus is {SuggestSpeech: false, SpeechNecessity: "低"} && !isForced)
+            {
+                shouldTrigger = false;
+                Bot?.Debug($"[{uin}] 触发被拦截: 总结建议不发言 (SuggestSpeech=false, SpeechNecessity=低)");
+            }
+            else
+            {
+                var reason = isForced ? "强制触发跳过总结建议检查" : $"总结建议发言或必要性不为低 (SuggestSpeech={summary.GroupChatStatus?.SuggestSpeech}, SpeechNecessity={summary.GroupChatStatus?.SpeechNecessity})";
+                Bot?.Debug($"[{uin}] 触发保持: {reason}");
+            }
+        }
+        else if (shouldTrigger)
+        {
+            Bot?.Debug($"[{uin}] 触发保持: 无总结数据，按初始触发结果执行");
+        }
+
         if (shouldTrigger)
         {
-            // 检查冷却
-            if (_lastReplyTime.TryGetValue(uin, out var lastTime))
+            // 检查冷却（强制触发跳过冷却检查）
+            if (!isForced && _lastReplyTime.TryGetValue(uin, out var lastTime))
             {
-                if ((DateTime.UtcNow - lastTime).TotalSeconds < _config.CooldownSeconds)
+                var cooldown = (DateTime.UtcNow - lastTime).TotalSeconds;
+                if (cooldown < _config.CooldownSeconds)
                 {
+                    Bot?.Debug($"[{uin}] 触发被拦截: 冷却中 (当前冷却: {cooldown:F1}s, 配置: {_config.CooldownSeconds}s)");
                     return;
                 }
             }
@@ -378,7 +444,7 @@ public class OllamaChatPlugin : PluginBase
 
         var messages = new List<OllamaMessage>
         {
-            new OllamaMessage {Role = "system", Content = summaryPrompt}
+            new OllamaMessage {Role = "system", Content = summaryPrompt, Timestamp = DateTime.UtcNow}
         };
         messages.AddRange(history);
 
@@ -452,7 +518,7 @@ public class OllamaChatPlugin : PluginBase
                 content = content.Substring(0, 2000) + "... [内容过长已截断]";
             }
 
-            messages.Add(new OllamaMessage {Role = role, Content = content});
+            messages.Add(new OllamaMessage {Role = role, Content = content, Timestamp = DateTime.UtcNow});
 
             // 获取当前目标的上下文限制，默认为全局配置
             var limit = _config.ContextMessageCount;
@@ -543,7 +609,7 @@ public class OllamaChatPlugin : PluginBase
 
         var messages = new List<OllamaMessage>
         {
-            new OllamaMessage {Role = "system", Content = systemPrompt}
+            new OllamaMessage {Role = "system", Content = systemPrompt, Timestamp = DateTime.UtcNow}
         };
         messages.AddRange(history);
 

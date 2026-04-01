@@ -16,7 +16,6 @@ public class Ioc
     /// <returns></returns>
     public static T? GetService<T>() where T : class
     {
-        using var scope = Container.BeginLifetimeScope();
-        return scope.Resolve<T>();
+        return Container.Resolve<T>();
     }
 }

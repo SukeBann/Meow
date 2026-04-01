@@ -1,6 +1,7 @@
 ﻿using Camille.Core.MiraiBase.Contract;
 using Camille.Core.MiraiBase.Models.Base;
 using Camille.Imp.MiraiBase;
+using Meow.Config;
 using Meow.Utils;
 using Serilog;
 
@@ -11,13 +12,13 @@ namespace Meow.Core;
 /// </summary>
 public abstract class MeowBase: MiraiBot
 {
-    protected MeowBase(IMiraiBotConfig miraiBotConfig, string meowName, string workFolder) : base(miraiBotConfig)
+    protected MeowBase(MeowConfig miraiBotConfig, string meowName, string workFolder) : base(miraiBotConfig)
     {
         MeowName = meowName;
         WorkFolder = workFolder;
         Log = Ioc.GetService<ILogger>() ?? LoggerCreator.GenerateLoggerConfig(workFolder).CreateLogger();
         Log.Debug("Meow Ctor invoke, work folder: {WorkFolder}", workFolder);
-        Database = new MeowDatabase(WorkFolder, MeowName, Log);
+        Database = new MeowDatabase(WorkFolder, MeowName, Log, miraiBotConfig.DatabaseType, miraiBotConfig.DbConnectionString);
     }
 
     #region Properties

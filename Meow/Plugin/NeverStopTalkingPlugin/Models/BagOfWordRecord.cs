@@ -33,7 +33,7 @@ public class BagOfWordRecord : DatabaseRecordBase
     /// <br/> key: 词
     /// <br/> value: 索引
     /// </summary>
-    [Column(StringLength = -1)]
+    [Column(DbType = "longtext")]
     public string BagOfWordJson
     {
         get => JsonConvert.SerializeObject(BagOfWord);

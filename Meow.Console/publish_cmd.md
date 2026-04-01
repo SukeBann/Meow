@@ -1,0 +1,1 @@
+dotnet publish Meow.Console -c Release -f net8.0 -r linux-x64 --self-contained -o D:/Code/GithubProj/Meow/Meow.Console/bin/Release/net8.0/linux-x64/publish

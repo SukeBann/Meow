@@ -111,6 +111,16 @@ public partial class Meow
     }
 
     /// <summary>
+    /// 消息链中是否是命令文本
+    /// </summary>
+    /// <param name="messageChain"></param>
+    /// <returns></returns>
+    public bool IsCommandMsg(MessageChain messageChain)
+    {
+        return TryParseCommand(messageChain, out _, out _);
+    }
+
+    /// <summary>
     /// 解析消息连中的第一条文本消息 如果为命令提示符开头 则尝试解析命令触发文本和参数
     /// </summary>
     /// <param name="messageChain">被解析的消息链</param>
