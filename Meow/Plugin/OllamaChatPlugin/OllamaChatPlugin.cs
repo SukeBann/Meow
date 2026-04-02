@@ -275,25 +275,24 @@ public class OllamaChatPlugin : PluginBase
 
         var roll = _random.Next(0, 1000);
         var shouldTrigger = roll < _config.TriggerProbability;
-        var triggerReason = $"随机数 {roll} < 概率 {_config.TriggerProbability}";
+        string triggerReason;
 
         var isForced = false;
-        if (!shouldTrigger)
-        {
-            var isFriend = container is FriendMiraiMsgContainer;
-            var isAt = container.MessageChain.Any(x => x is At at && at.Target == Bot.BotQq);
+        var isFriend = container is FriendMiraiMsgContainer;
+        var isAt = container.MessageChain.Any(x => x is At at && at.Target == Bot.BotQq);
 
-            if (isFriend || isAt)
-            {
-                shouldTrigger = true;
-                isForced = true;
-                triggerReason = isFriend ? "私聊强制触发" : "被 @ 强制触发";
-            }
-            else
-            {
-                triggerReason = $"随机数 {roll} >= 概率 {_config.TriggerProbability}，未触发";
-            }
+        if (isFriend || isAt)
+        {
+            shouldTrigger = true;
+            isForced = true;
+            triggerReason = isFriend ? "私聊强制触发" : "被 @ 强制触发";
         }
+        else
+        {
+            triggerReason = $"随机数 {roll} >= 概率 {_config.TriggerProbability}，未触发";
+        }
+
+        shouldTrigger = shouldTrigger || isForced;
 
         Bot?.Debug($"[{uin}] 初始触发检查: shouldTrigger={shouldTrigger}, 原因: {triggerReason}");
 

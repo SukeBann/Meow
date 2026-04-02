@@ -16,6 +16,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Camille.Shared", "..\..\Too
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Camille.Logger", "..\..\Tools\Camille\Camille.Logger\Camille.Logger.csproj", "{86FE8881-5A0E-4B80-9CE5-176CBE7D45CA}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Camille", "Camille", "{E8FDF52E-8FA8-415D-9D6A-9AED950C20BF}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -125,5 +127,11 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{E225C603-A183-4AC5-A5EA-10C38FEB60E7} = {E8FDF52E-8FA8-415D-9D6A-9AED950C20BF}
+		{18FBC4DF-405D-4709-B1F9-28F4199501AE} = {E8FDF52E-8FA8-415D-9D6A-9AED950C20BF}
+		{86FE8881-5A0E-4B80-9CE5-176CBE7D45CA} = {E8FDF52E-8FA8-415D-9D6A-9AED950C20BF}
+		{76857DCD-2B68-498C-890C-C088FC510E94} = {E8FDF52E-8FA8-415D-9D6A-9AED950C20BF}
 	EndGlobalSection
 EndGlobal
