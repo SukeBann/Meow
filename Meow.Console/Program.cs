@@ -1,4 +1,6 @@
-﻿using Meow.Bootstrapper;
+﻿using System;
+using System.Threading.Tasks;
+using Meow.Bootstrapper;
 using Meow.Plugin;
 using Meow.Plugin.HelpPlugin;
 using Meow.Plugin.NeverStopTalkingPlugin;

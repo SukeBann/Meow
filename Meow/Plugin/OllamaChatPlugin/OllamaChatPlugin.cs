@@ -94,9 +94,9 @@ public class OllamaChatPlugin : PluginBase
     {
         try
         {
-            if (System.IO.File.Exists(_olConfigPath))
+            if (File.Exists(_olConfigPath))
             {
-                var json = System.IO.File.ReadAllText(_olConfigPath);
+                var json = File.ReadAllText(_olConfigPath);
                 _config = JsonConvert.DeserializeObject<OllamaConfig>(json) ?? new OllamaConfig();
             }
             else
@@ -105,9 +105,9 @@ public class OllamaChatPlugin : PluginBase
                 SaveConfig();
             }
             
-            if (System.IO.File.Exists(_ttsConfigPath))
+            if (File.Exists(_ttsConfigPath))
             {
-                var json = System.IO.File.ReadAllText(_ttsConfigPath);
+                var json = File.ReadAllText(_ttsConfigPath);
                 _fishTtsConfig = JsonConvert.DeserializeObject<FishTtsConfig>(json) ?? throw new Exception("can't find fish tts config");
             }
 
@@ -128,19 +128,19 @@ public class OllamaChatPlugin : PluginBase
         var summaryPromptPath = Path.Combine(dir!, "summary_prompt.txt");
         var systemSupplementPrompts = Path.Combine(dir!, "system_supplement_prompt.txt");
 
-        if (System.IO.File.Exists(systemPromptPath))
+        if (File.Exists(systemPromptPath))
         {
-            _config.SystemPrompt = System.IO.File.ReadAllText(systemPromptPath);
+            _config.SystemPrompt = File.ReadAllText(systemPromptPath);
         }
 
-        if (System.IO.File.Exists(systemSupplementPrompts))
+        if (File.Exists(systemSupplementPrompts))
         {
-            _config.SystemPrompt = _config.SystemPrompt + "\n" + System.IO.File.ReadAllText(systemSupplementPrompts);
+            _config.SystemPrompt = _config.SystemPrompt + "\n" + File.ReadAllText(systemSupplementPrompts);
         }
 
-        if (System.IO.File.Exists(summaryPromptPath))
+        if (File.Exists(summaryPromptPath))
         {
-            _config.SummaryPrompt = System.IO.File.ReadAllText(summaryPromptPath);
+            _config.SummaryPrompt = File.ReadAllText(summaryPromptPath);
         }
     }
 
@@ -149,9 +149,9 @@ public class OllamaChatPlugin : PluginBase
         var dir = Path.GetDirectoryName(_olConfigPath);
         var systemPromptPath = Path.Combine(dir!, "system_prompt.txt");
 
-        if (!System.IO.File.Exists(systemPromptPath)) return;
+        if (!File.Exists(systemPromptPath)) return;
 
-        var content = System.IO.File.ReadAllText(systemPromptPath);
+        var content = File.ReadAllText(systemPromptPath);
         var newBlock = $"<ROLE_SETTING>\n{newRole}\n</ROLE_SETTING>";
 
         if (content.Contains("<ROLE_SETTING_REPLACE>"))
@@ -167,7 +167,7 @@ public class OllamaChatPlugin : PluginBase
             }
         }
 
-        System.IO.File.WriteAllText(systemPromptPath, content);
+        File.WriteAllText(systemPromptPath, content);
         LoadPrompts();
     }
 
@@ -182,7 +182,7 @@ public class OllamaChatPlugin : PluginBase
             }
 
             var json = JsonConvert.SerializeObject(_config, Formatting.Indented);
-            System.IO.File.WriteAllText(_olConfigPath, json);
+            File.WriteAllText(_olConfigPath, json);
         }
         catch (Exception e)
         {
@@ -236,6 +236,10 @@ public class OllamaChatPlugin : PluginBase
         if (_fishTtsConfig != null)
         {
             _ttsApiService = new FishTtsApiService(host, _fishTtsConfig);
+        }
+        else
+        {
+            host.Info("No fish tts config found, skip tts service");
         }
 
         SyncDatabaseStructure();
@@ -470,7 +474,7 @@ public class OllamaChatPlugin : PluginBase
         {
             // 更稳健的 JSON 提取方式：优先寻找 Markdown 代码块，其次寻找首尾花括号
             string json;
-            var match = System.Text.RegularExpressions.Regex.Match(response, @"```json\s*([\s\S]*?)\s*```");
+            var match = Regex.Match(response, @"```json\s*([\s\S]*?)\s*```");
             if (match.Success)
             {
                 json = match.Groups[1].Value;

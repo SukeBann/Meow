@@ -1,4 +1,5 @@
-﻿using System.Windows;
+﻿using System;
+using System.Windows;
 using Meow.Bootstrapper;
 using Meow.Plugin;
 using Meow.Plugin.HelpPlugin;

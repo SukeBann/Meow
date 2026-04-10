@@ -44,10 +44,10 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\..\Tools\Camille\Camille.Core\Camille.Core.csproj" />
-      <ProjectReference Include="..\..\..\Tools\Camille\Camille.Imp\Camille.Imp.csproj" />
-      <ProjectReference Include="..\..\..\Tools\Camille\Camille.Logger\Camille.Logger.csproj" />
-      <ProjectReference Include="..\..\..\Tools\Camille\Camille.Shared\Camille.Shared.csproj" />
+      <ProjectReference Include="..\..\..\Camille\Camille.Core\Camille.Core.csproj" />
+      <ProjectReference Include="..\..\..\Camille\Camille.Imp\Camille.Imp.csproj" />
+      <ProjectReference Include="..\..\..\Camille\Camille.Logger\Camille.Logger.csproj" />
+      <ProjectReference Include="..\..\..\Camille\Camille.Shared\Camille.Shared.csproj" />
     </ItemGroup>
 
 </Project>

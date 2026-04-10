@@ -1,6 +1,7 @@
-﻿using System.Windows;
+﻿using System;
+using System.Windows;
 using System.Windows.Controls;
-
+using Camille.Core.MiraiBase.Models.Base;
 using Lagrange.Core.Message.Entity;
 using Meow.UI.ViewModels;
 using Meow.UI.ViewModels.Models;

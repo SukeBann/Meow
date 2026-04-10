@@ -8,13 +8,13 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Meow.UI", "Meow.UI\Meow.UI.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Meow.DataMigration", "Meow.DataMigration\Meow.DataMigration.csproj", "{6E81FE49-EAA8-49AF-AE44-FCE28715BA37}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Camille.Core", "..\..\Tools\Camille\Camille.Core\Camille.Core.csproj", "{E225C603-A183-4AC5-A5EA-10C38FEB60E7}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Camille.Core", "..\..\Camille\Camille.Core\Camille.Core.csproj", "{E225C603-A183-4AC5-A5EA-10C38FEB60E7}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Camille.Imp", "..\..\Tools\Camille\Camille.Imp\Camille.Imp.csproj", "{18FBC4DF-405D-4709-B1F9-28F4199501AE}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Camille.Imp", "..\..\Camille\Camille.Imp\Camille.Imp.csproj", "{18FBC4DF-405D-4709-B1F9-28F4199501AE}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Camille.Shared", "..\..\Tools\Camille\Camille.Shared\Camille.Shared.csproj", "{76857DCD-2B68-498C-890C-C088FC510E94}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Camille.Shared", "..\..\Camille\Camille.Shared\Camille.Shared.csproj", "{76857DCD-2B68-498C-890C-C088FC510E94}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Camille.Logger", "..\..\Tools\Camille\Camille.Logger\Camille.Logger.csproj", "{86FE8881-5A0E-4B80-9CE5-176CBE7D45CA}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Camille.Logger", "..\..\Camille\Camille.Logger\Camille.Logger.csproj", "{86FE8881-5A0E-4B80-9CE5-176CBE7D45CA}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Camille", "Camille", "{E8FDF52E-8FA8-415D-9D6A-9AED950C20BF}"
 EndProject

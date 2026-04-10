@@ -1,4 +1,5 @@
 ﻿
+using Camille.Core.MiraiBase.Models.Base;
 using PropertyChanged;
 
 namespace Meow.UI.ViewModels.Models;

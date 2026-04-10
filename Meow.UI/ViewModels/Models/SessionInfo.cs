@@ -1,5 +1,7 @@
-﻿using System.Reactive.Linq;
+﻿using System;
+using System.Reactive.Linq;
 using System.Windows;
+using Camille.Core.MiraiBase.Models.Base;
 
 namespace Meow.UI.ViewModels.Models;
 

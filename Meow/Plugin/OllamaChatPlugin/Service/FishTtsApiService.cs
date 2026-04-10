@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text;
 using Meow.Plugin.OllamaChatPlugin.Models;
 using Newtonsoft.Json;
@@ -6,7 +7,15 @@ namespace Meow.Plugin.OllamaChatPlugin.Service;
 
 public class FishTtsApiService
 {
-    private static readonly HttpClient SharedHttpClient = new() {Timeout = TimeSpan.FromMinutes(2)};
+    private static readonly HttpClient SharedHttpClient = new(new SocketsHttpHandler()
+    {
+        Proxy = new WebProxy("http://localhost:7890"),
+        UseProxy = true,
+    })
+    {
+        Timeout = TimeSpan.FromSeconds(45),
+        
+    };
 
     private readonly Core.Meow _bot;
     private readonly FishTtsConfig _config;
@@ -41,6 +50,7 @@ public class FishTtsApiService
             request.Content = new StringContent(
                 JsonConvert.SerializeObject(requestBody), Encoding.UTF8, "application/json");
 
+            
             var response = await SharedHttpClient.SendAsync(request).ConfigureAwait(false);
 
             if (!response.IsSuccessStatusCode)

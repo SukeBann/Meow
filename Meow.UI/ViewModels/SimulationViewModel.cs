@@ -1,6 +1,7 @@
-﻿using System.Collections.ObjectModel;
+﻿using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Diagnostics.CodeAnalysis;
-
+using Camille.Core.MiraiBase.Models.Base;
 using Meow.Core.Model.Base;
 using Meow.UI.ViewModels.Models;
 using PropertyChanged;
