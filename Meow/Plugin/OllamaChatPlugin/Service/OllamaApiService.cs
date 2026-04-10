@@ -69,7 +69,7 @@ public class OllamaApiService
         {
             var sb = new StringBuilder();
             var lines = responseJson
-                .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
 
             foreach (var line in lines)
             {

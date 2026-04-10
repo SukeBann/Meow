@@ -13,6 +13,7 @@ using Meow.Plugin.OllamaChatPlugin.Command;
 using Meow.Plugin.OllamaChatPlugin.Models;
 using Meow.Plugin.OllamaChatPlugin.Service;
 using Newtonsoft.Json;
+using File = System.IO.File;
 
 namespace Meow.Plugin.OllamaChatPlugin;
 
@@ -25,8 +26,11 @@ public class OllamaChatPlugin : PluginBase
     public override List<IMeowCommand> Commands { get; } = new();
 
     private OllamaConfig _config;
+    private FishTtsConfig? _fishTtsConfig;
     private OllamaApiService _apiService;
-    private readonly string _configPath;
+    private FishTtsApiService? _ttsApiService;
+    private readonly string _olConfigPath;
+    private readonly string _ttsConfigPath;
     private IDisposable? _messageSubscription;
     private readonly Random _random = new();
 
@@ -79,7 +83,7 @@ public class OllamaChatPlugin : PluginBase
 
     public OllamaChatPlugin()
     {
-        _configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "PluginResource", "OllamaChatPlugin",
+        _olConfigPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "PluginResource", "OllamaChatPlugin",
             "config.json");
         LoadConfig();
     }
@@ -88,15 +92,21 @@ public class OllamaChatPlugin : PluginBase
     {
         try
         {
-            if (System.IO.File.Exists(_configPath))
+            if (System.IO.File.Exists(_olConfigPath))
             {
-                var json = System.IO.File.ReadAllText(_configPath);
+                var json = System.IO.File.ReadAllText(_olConfigPath);
                 _config = JsonConvert.DeserializeObject<OllamaConfig>(json) ?? new OllamaConfig();
             }
             else
             {
                 _config = new OllamaConfig();
                 SaveConfig();
+            }
+            
+            if (System.IO.File.Exists(_ttsConfigPath))
+            {
+                var json = System.IO.File.ReadAllText(_ttsConfigPath);
+                _fishTtsConfig = JsonConvert.DeserializeObject<FishTtsConfig>(json) ?? throw new Exception("can't find fish tts config");
             }
 
             LoadPrompts();
@@ -111,7 +121,7 @@ public class OllamaChatPlugin : PluginBase
 
     private void LoadPrompts()
     {
-        var dir = Path.GetDirectoryName(_configPath);
+        var dir = Path.GetDirectoryName(_olConfigPath);
         var systemPromptPath = Path.Combine(dir!, "system_prompt.txt");
         var summaryPromptPath = Path.Combine(dir!, "summary_prompt.txt");
         var systemSupplementPrompts = Path.Combine(dir!, "system_supplement_prompt.txt");
@@ -134,7 +144,7 @@ public class OllamaChatPlugin : PluginBase
 
     private void UpdateRoleSetting(string newRole)
     {
-        var dir = Path.GetDirectoryName(_configPath);
+        var dir = Path.GetDirectoryName(_olConfigPath);
         var systemPromptPath = Path.Combine(dir!, "system_prompt.txt");
 
         if (!System.IO.File.Exists(systemPromptPath)) return;
@@ -163,14 +173,14 @@ public class OllamaChatPlugin : PluginBase
     {
         try
         {
-            var dir = Path.GetDirectoryName(_configPath);
+            var dir = Path.GetDirectoryName(_olConfigPath);
             if (!Directory.Exists(dir))
             {
                 Directory.CreateDirectory(dir!);
             }
 
             var json = JsonConvert.SerializeObject(_config, Formatting.Indented);
-            System.IO.File.WriteAllText(_configPath, json);
+            System.IO.File.WriteAllText(_olConfigPath, json);
         }
         catch (Exception e)
         {
@@ -221,6 +231,10 @@ public class OllamaChatPlugin : PluginBase
         Commands.Add(new OllamaClearCommand(ClearContext));
         base.InjectPlugin(host);
         _apiService = new OllamaApiService(host, _config);
+        if (_fishTtsConfig != null)
+        {
+            _ttsApiService = new FishTtsApiService(host, _fishTtsConfig);
+        }
 
         SyncDatabaseStructure();
         LoadDataFromDb();
@@ -647,9 +661,35 @@ public class OllamaChatPlugin : PluginBase
 
             // 更新上次发言时间
             _lastReplyTime[uin] = DateTime.UtcNow;
-
             // 发送回复
-            container.MessageChain = new Camille.Core.MiraiBase.Models.Base.MessageChain {new Plain(response)};
+            container.MessageChain = [new Plain(response)];
+            if (_ttsApiService != null && (summary?.GroupChatStatus.TtsVoiceIsRequired ?? false))
+            {
+                var filePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "temp.mp3");
+                try
+                {
+                    if (!await _ttsApiService.SynthesizeToFileAsync(response, "temp.mp3"))
+                    {
+                        return;
+                    }
+                    container.MessageChain = [new Voice(){Path = filePath}];
+                    await container.SendToAsync(Bot!).ConfigureAwait(false);
+                    return;
+                }
+                catch (Exception e)
+                {
+                    Bot!.Error("Send Voice Msg Error", e);
+                    return;
+                }
+                finally
+                {
+                    if (File.Exists(filePath))
+                    { 
+                        File.Delete(filePath); 
+                    }
+                }
+            }
+
             await container.SendToAsync(Bot).ConfigureAwait(false);
         }
     }

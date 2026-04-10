@@ -7,6 +7,12 @@ public class UserPortrait
     [JsonProperty("用户名")]
     public string UserName { get; set; } = string.Empty;
 
+    [JsonProperty("外号")]
+    public string Nickname { get; set; } = string.Empty;
+    
+    [JsonProperty("兴趣")]
+    public string Hobby { get; set; } = string.Empty;
+    
     [JsonProperty("稳定风格总结")]
     public string StableStyle { get; set; } = string.Empty;
 
@@ -66,6 +72,9 @@ public class GroupChatStatus
 
     [JsonProperty("最后更新时间")]
     public DateTime LastUpdateTime { get; set; } = DateTime.UtcNow;
+
+    [JsonProperty("是否启用语音生成回复")] 
+    public bool TtsVoiceIsRequired { get; set; } = false;
 }
 
 public class OllamaSummaryResponse
