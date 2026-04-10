@@ -85,6 +85,8 @@ public class OllamaChatPlugin : PluginBase
     {
         _olConfigPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "PluginResource", "OllamaChatPlugin",
             "config.json");
+        _ttsConfigPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "PluginResource", "OllamaChatPlugin",
+            "fish_tts_config.json");
         LoadConfig();
     }
 
@@ -663,13 +665,18 @@ public class OllamaChatPlugin : PluginBase
             _lastReplyTime[uin] = DateTime.UtcNow;
             // 发送回复
             container.MessageChain = [new Plain(response)];
-            if (_ttsApiService != null && (summary?.GroupChatStatus.TtsVoiceIsRequired ?? false))
+            if (_ttsApiService != null && ((summary?.GroupChatStatus.TtsVoiceIsRequired ?? false) || response.Contains("<v>") || response.Contains("</v>")))
             {
-                var filePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "temp.mp3");
+                var fileName = $"tts_{Guid.NewGuid():N}.mp3";
+                var filePath = Path.Combine(Path.GetTempPath(), fileName);
+                response = response.Replace("<v>", "[").Replace("</v>", "]");
                 try
                 {
-                    if (!await _ttsApiService.SynthesizeToFileAsync(response, "temp.mp3"))
+                    if (!await _ttsApiService.SynthesizeToFileAsync(response, filePath))
                     {
+                        var plainResponse = Regex.Replace(response, @"\[.*?\]", "").Trim();
+                        container.MessageChain = [new Plain(plainResponse)];
+                        await container.SendToAsync(Bot!).ConfigureAwait(false);
                         return;
                     }
                     container.MessageChain = [new Voice(){Path = filePath}];

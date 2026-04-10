@@ -6,82 +6,42 @@ namespace Meow.Plugin.OllamaChatPlugin.Service;
 
 public class FishTtsApiService
 {
-    private readonly HttpClient _httpClient;
+    private static readonly HttpClient SharedHttpClient = new() {Timeout = TimeSpan.FromMinutes(2)};
+
     private readonly Core.Meow _bot;
     private readonly FishTtsConfig _config;
+    private readonly string _apiKey;
+    private readonly string _referenceId;
 
     public FishTtsApiService(Core.Meow bot, FishTtsConfig config)
     {
         _bot = bot;
         _config = config;
-        _httpClient = new HttpClient { Timeout = TimeSpan.FromMinutes(2) };
-    }
-
-    /// <summary>
-    /// 从文本文件读取 API Key
-    /// </summary>
-    private string ReadApiKey()
-    {
-        if (!File.Exists(_config.ApiKeyFilePath))
-        {
-            throw new FileNotFoundException($"API Key 文件未找到: {_config.ApiKeyFilePath}");
-        }
-
-        var key = File.ReadAllText(_config.ApiKeyFilePath).Trim();
-        if (string.IsNullOrWhiteSpace(key))
-        {
-            throw new InvalidOperationException("API Key 文件内容为空");
-        }
-
-        return key;
-    }
-
-    /// <summary>
-    /// 从文本文件读取 Reference ID（音色标识）
-    /// </summary>
-    private string ReadReferenceId()
-    {
-        if (!File.Exists(_config.ReferenceIdFilePath))
-        {
-            throw new FileNotFoundException($"Reference ID 文件未找到: {_config.ReferenceIdFilePath}");
-        }
-
-        var id = File.ReadAllText(_config.ReferenceIdFilePath).Trim();
-        if (string.IsNullOrWhiteSpace(id))
-        {
-            throw new InvalidOperationException("Reference ID 文件内容为空");
-        }
-
-        return id;
+        _apiKey = config.ApiKey;
+        _referenceId = config.ReferenceId;
     }
 
     /// <summary>
     /// 调用 Fish Audio TTS 接口，将文本转为语音并保存到指定路径
     /// </summary>
-    /// <param name="text">要合成的文本</param>
-    /// <param name="outputPath">输出音频文件路径</param>
-    /// <returns>成功返回 true</returns>
     public async Task<bool> SynthesizeToFileAsync(string text, string outputPath)
     {
         try
         {
-            var apiKey = ReadApiKey();
-            var referenceId = ReadReferenceId();
-
             var requestBody = new
             {
                 text,
-                reference_id = referenceId,
+                reference_id = _referenceId,
                 format = _config.Format
             };
 
             using var request = new HttpRequestMessage(HttpMethod.Post, _config.ApiUrl);
-            request.Headers.Add("Authorization", $"Bearer {apiKey}");
+            request.Headers.Add("Authorization", $"Bearer {_apiKey}");
             request.Headers.Add("model", _config.Model);
             request.Content = new StringContent(
                 JsonConvert.SerializeObject(requestBody), Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.SendAsync(request).ConfigureAwait(false);
+            var response = await SharedHttpClient.SendAsync(request).ConfigureAwait(false);
 
             if (!response.IsSuccessStatusCode)
             {

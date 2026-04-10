@@ -1,0 +1,7 @@
+{
+  "ApiKey": "XXX",
+  "ReferenceId": "XXX",
+  "ApiUrl": "https://api.fish.audio/v1/tts",
+  "Model": "s2-pro",
+  "Format": "mp3"
+}
