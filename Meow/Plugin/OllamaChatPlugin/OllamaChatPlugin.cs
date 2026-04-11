@@ -365,7 +365,7 @@ public partial class OllamaChatPlugin : PluginBase
             foreach (var container in messagesToProcess)
             {
                 // 获取纯文本内容
-                var textMsg = container.MessageChain.GetMessageDetail().ToString();
+                var textMsg = container.MessageChain.GetPlainMessage();
                 Bot.Debug($"Message for uin {uin}: {textMsg}");
                 if (string.IsNullOrEmpty(textMsg))
                 {
@@ -409,9 +409,13 @@ public partial class OllamaChatPlugin : PluginBase
                     isForced = true;
                     triggerReason = isFriend ? "私聊强制触发" : "被 @ 强制触发";
                 }
-                else
+                else if(roll >= _config.TriggerProbability)
                 {
                     triggerReason = $"随机数 {roll} >= 概率 {_config.TriggerProbability}，未触发";
+                }
+                else
+                {
+                    triggerReason = $"随机数 {roll} < 概率 {_config.TriggerProbability}，触发";
                 }
 
                 // Bot自己的消息不触发发送, 只做消息总结和归纳
@@ -460,17 +464,17 @@ public partial class OllamaChatPlugin : PluginBase
                 }
 
                 // 判定是否最终触发回复
-                if (shouldTrigger)
-                {
-                    if (_summaryCache.TryGetValue(uin, out var summary))
-                    {
-                        if (summary.GroupChatStatus is { SuggestSpeech: false, SpeechNecessity: "低" } && !isForced)
-                        {
-                            shouldTrigger = false;
-                            Bot?.Debug($"[{uin}] 触发被拦截: 总结建议不发言 (SuggestSpeech=false, SpeechNecessity=低)");
-                        }
-                    }
-                }
+                // if (shouldTrigger)
+                // {
+                    // if (_summaryCache.TryGetValue(uin, out var summary))
+                    // {
+                        // if (summary.GroupChatStatus is { SuggestSpeech: false, SpeechNecessity: "低" } && !isForced)
+                        // {
+                            // shouldTrigger = false;
+                            // Bot?.Debug($"[{uin}] 触发被拦截: 总结建议不发言 (SuggestSpeech=false, SpeechNecessity=低)");
+                        // }
+                    // }
+                // }
 
                 if (shouldTrigger)
                 {
