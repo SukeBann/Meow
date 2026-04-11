@@ -79,8 +79,8 @@ public class OllamaConfigCommand : IMeowCommand
             sb.AppendLine($"冷却时间: {_config.CooldownSeconds}s");
             sb.AppendLine($"私聊启用: {_config.EnablePrivateChat}");
             sb.AppendLine($"允许群聊: {string.Join(", ", _config.AllowedGroups)}");
-            sb.AppendLine($"对话提示词: {_config.SystemPrompt.Substring(0, Math.Min(30, _config.SystemPrompt.Length))}...");
-            sb.AppendLine($"总结提示词: {_config.SummaryPrompt.Substring(0, Math.Min(30, _config.SummaryPrompt.Length))}...");
+            sb.AppendLine($"对话提示词: {_config.SystemPrompt}");
+            sb.AppendLine($"总结提示词: {_config.SummaryPrompt}");
             return Task.FromResult((true, (MessageChain)sb.ToString().Trim()));
         }
 

@@ -13,11 +13,13 @@ using Meow.Plugin.OllamaChatPlugin.Command;
 using Meow.Plugin.OllamaChatPlugin.Models;
 using Meow.Plugin.OllamaChatPlugin.Service;
 using Newtonsoft.Json;
+using Serilog;
+using SharpCompress.Factories;
 using File = System.IO.File;
 
 namespace Meow.Plugin.OllamaChatPlugin;
 
-public class OllamaChatPlugin : PluginBase
+public partial class OllamaChatPlugin : PluginBase
 {
     public override string PluginName => "Ollama Chat Plugin";
     public override string PluginDescription => "接入Ollama API实现AI聊天功能，模拟群员对话。";
@@ -49,6 +51,13 @@ public class OllamaChatPlugin : PluginBase
     // 用于标记正在进行总结的群，防止并发总结
     private readonly ConcurrentDictionary<long, bool> _isSummaryRunning = new();
 
+    // 待处理消息队列，Key为群号或私聊QQ号
+    private readonly ConcurrentDictionary<long, ConcurrentQueue<IMiraiMessageContainer>> _pendingMessages = new();
+
+    // 标记各会话是否正在处理消息
+    // 替换 _isSessionProcessing
+    private readonly ConcurrentDictionary<long, SemaphoreSlim> _sessionSemaphores = new();
+
     // 用于对每个群的消息列表进行加锁
     private readonly ConcurrentDictionary<long, object> _locks = new();
 
@@ -62,6 +71,8 @@ public class OllamaChatPlugin : PluginBase
             _messageCounter.TryRemove(uin, out _);
             _lastReplyTime.TryRemove(uin, out _);
             _isSummaryRunning.TryRemove(uin, out _);
+            _pendingMessages.TryRemove(uin, out _);
+            _sessionSemaphores.TryRemove(uin, out _);
             _locks.TryRemove(uin, out _);
 
             if (Bot != null)
@@ -245,16 +256,18 @@ public class OllamaChatPlugin : PluginBase
         SyncDatabaseStructure();
         LoadDataFromDb();
 
-        _messageSubscription = host.OnMiraiMessageReceived.Subscribe(async x =>
+        _messageSubscription = host.OnMiraiMessageReceived.Subscribe(x =>
         {
             try
             {
                 if (host.IsCommandMsg(x.MessageChain))
                 {
+                    Bot?.Debug($"Command message received, skip processing");
                     return;
                 }
-
-                await HandleMessage(x).ConfigureAwait(false);
+                
+                Bot.Debug($"Message received: {x.MessageChain.GetMessageDetail().ToString()}");
+                HandleMessage(x);
             }
             catch (Exception e)
             {
@@ -263,138 +276,227 @@ public class OllamaChatPlugin : PluginBase
         });
     }
 
-    private async Task HandleMessage(IMiraiMessageContainer container)
+    private void HandleMessage(IMiraiMessageContainer container)
     {
         if (Bot == null) return;
 
-        // 获取纯文本内容
-        var textMsg = container.MessageChain.GetPlainMessage().Trim();
-        if (string.IsNullOrEmpty(textMsg)) return;
-
-        // 忽略 Bot 自己的消息
-        if (container is MiraiMsgContainerBase baseContainer && baseContainer.Sender?.Id == Bot.BotQq) return;
-
-        var uin = (long) 0;
-        var isGroup = false;
-
-        var userName = "unknownUser";
+        var uin = (long)0;
         switch (container)
         {
             case GroupMiraiMsgContainer groupMsg:
                 uin = groupMsg.Sender?.Group?.Id ?? 0;
-                userName = $"[{groupMsg.Sender?.Id}-{groupMsg.Sender?.MemberName}]";
-                isGroup = true;
                 break;
             case FriendMiraiMsgContainer friendMsg:
                 uin = friendMsg.Sender?.Id ?? 0;
-                userName = friendMsg.Sender?.Nickname ?? "unknownFriend";
                 break;
         }
 
         if (uin == 0) return;
 
-        var roll = _random.Next(0, 1000);
-        var shouldTrigger = roll < _config.TriggerProbability;
-        string triggerReason;
+        var queue = _pendingMessages.GetOrAdd(uin, _ => new ConcurrentQueue<IMiraiMessageContainer>());
+        queue.Enqueue(container);
 
-        var isForced = false;
-        var isFriend = container is FriendMiraiMsgContainer;
-        var isAt = container.MessageChain.Any(x => x is At at && at.Target == Bot.BotQq);
+        var semaphore = _sessionSemaphores.GetOrAdd(uin, _ => new SemaphoreSlim(1, 1));
 
-        if (isFriend || isAt)
+        // 如果拿不到锁，说明已有 Worker 在处理，它的 while 循环会处理到这条新消息
+        if (semaphore.CurrentCount > 0)
         {
-            shouldTrigger = true;
-            isForced = true;
-            triggerReason = isFriend ? "私聊强制触发" : "被 @ 强制触发";
-        }
-        else
-        {
-            triggerReason = $"随机数 {roll} >= 概率 {_config.TriggerProbability}，未触发";
-        }
-
-        shouldTrigger = shouldTrigger || isForced;
-
-        Bot?.Debug($"[{uin}] 初始触发检查: shouldTrigger={shouldTrigger}, 原因: {triggerReason}");
-
-        const string role = "user";
-
-        // 白名单检查
-        if (isGroup)
-        {
-            if (!_config.AllowedGroups.Contains(uin)) return;
-        }
-        else
-        {
-            if (!_config.EnablePrivateChat) return;
-        }
-
-        // 结构化包装消息，增加属性以辅助模型区分指令与内容
-        var structuredMsg = JsonConvert.SerializeObject(new
-        {
-            speaker = userName,
-            source = container is GroupMiraiMsgContainer ? "group" : "friend",
-            text = textMsg,
-            is_user_input = true // 标记为用户输入，防止 Prompt Injection
-        });
-
-        // 更新消息计数并检查是否需要总结
-        var count = _messageCounter.AddOrUpdate(uin, 1, (_, c) => c + 1);
-
-        // 记录上下文
-        UpdateContext(uin, role, structuredMsg, count);
-
-        if (count >= _config.SummaryFrequency || !_summaryCache.ContainsKey(uin))
-        {
-            if (_isSummaryRunning.TryAdd(uin, true))
+            _ = Task.Run(async () =>
             {
-                _messageCounter[uin] = 0;
-                _ = Task.Run(async () =>
+                if (!await semaphore.WaitAsync(0))
                 {
-                    try
-                    {
-                        await UpdateSummary(uin, _cts.Token).ConfigureAwait(false);
-                    }
-                    finally
-                    {
-                        _isSummaryRunning.TryRemove(uin, out _);
-                    }
-                }, _cts.Token);
-            }
-        }
-
-        // 检查概率
-        if (shouldTrigger && _summaryCache.TryGetValue(uin, out var summary))
-        {
-            if (summary.GroupChatStatus is {SuggestSpeech: false, SpeechNecessity: "低"} && !isForced)
-            {
-                shouldTrigger = false;
-                Bot?.Debug($"[{uin}] 触发被拦截: 总结建议不发言 (SuggestSpeech=false, SpeechNecessity=低)");
-            }
-            else
-            {
-                var reason = isForced ? "强制触发跳过总结建议检查" : $"总结建议发言或必要性不为低 (SuggestSpeech={summary.GroupChatStatus?.SuggestSpeech}, SpeechNecessity={summary.GroupChatStatus?.SpeechNecessity})";
-                Bot?.Debug($"[{uin}] 触发保持: {reason}");
-            }
-        }
-        else if (shouldTrigger)
-        {
-            Bot?.Debug($"[{uin}] 触发保持: 无总结数据，按初始触发结果执行");
-        }
-
-        if (shouldTrigger)
-        {
-            // 检查冷却（强制触发跳过冷却检查）
-            if (!isForced && _lastReplyTime.TryGetValue(uin, out var lastTime))
-            {
-                var cooldown = (DateTime.UtcNow - lastTime).TotalSeconds;
-                if (cooldown < _config.CooldownSeconds)
+                    Bot?.Debug($"Failed to acquire semaphore for uin {uin}");
+                    return; // 双重检查，拿不到就退出
+                }
+                try
                 {
-                    Bot?.Debug($"[{uin}] 触发被拦截: 冷却中 (当前冷却: {cooldown:F1}s, 配置: {_config.CooldownSeconds}s)");
-                    return;
+                    await ProcessSessionQueue(uin).ConfigureAwait(false);
+                }
+                finally
+                {
+                    semaphore.Release();
+
+                    // 释放后再检查，防止竞态
+                    if (_pendingMessages.TryGetValue(uin, out var q) && !q.IsEmpty)
+                    {
+                        if (await semaphore.WaitAsync(0))
+                        {
+                            try
+                            {
+                                await ProcessSessionQueue(uin).ConfigureAwait(false);
+                            }
+                            finally
+                            {
+                                semaphore.Release();
+                            }
+                        }
+                    }
+                }
+            }, _cts.Token);
+        }
+    }
+
+    private async Task ProcessSessionQueue(long uin)
+    {
+        if (!_pendingMessages.TryGetValue(uin, out var queue))
+        {
+            Bot?.Debug($"No pending messages for uin {uin}");
+            return;
+        }
+
+        Bot?.Debug($"queue size: {queue.Count} for uin {uin}, pending messages: {string.Join(", ", queue.Select(x => x.MessageChain.GetMessageDetail().ToString()))}");
+        while (!queue.IsEmpty)
+        {
+            var messagesToProcess = new List<IMiraiMessageContainer>();
+            while (queue.TryDequeue(out var msg))
+            {
+                messagesToProcess.Add(msg);
+            }
+
+            if (messagesToProcess.Count == 0)
+            {
+                Bot?.Debug($"No messages to process for uin {uin}");
+                break;
+            }
+
+            IMiraiMessageContainer? lastTriggerContainer = null;
+            var anyTriggered = false;
+
+            foreach (var container in messagesToProcess)
+            {
+                // 获取纯文本内容
+                var textMsg = container.MessageChain.GetMessageDetail().ToString();
+                Bot.Debug($"Message for uin {uin}: {textMsg}");
+                if (string.IsNullOrEmpty(textMsg))
+                {
+                    Bot?.Debug($"Skipping empty message for uin {uin}");
+                    continue;
+                }
+
+                var isGroup = false;
+                // 白名单检查
+                if (isGroup)
+                {
+                    if (!_config.AllowedGroups.Contains(uin)) continue;
+                }
+                else
+                {
+                    if (!_config.EnablePrivateChat) continue;
+                }
+                
+                var userName = "unknownUser";
+                switch (container)
+                {
+                    case GroupMiraiMsgContainer groupMsg:
+                        userName = $"[{groupMsg.Sender?.Id}-{groupMsg.Sender?.MemberName}]";
+                        isGroup = true;
+                        break;
+                    case FriendMiraiMsgContainer friendMsg:
+                        userName = friendMsg.Sender?.Nickname ?? "unknownFriend";
+                        break;
+                }
+
+                var roll = _random.Next(0, 1000);
+                var shouldTrigger = roll < _config.TriggerProbability;
+                string triggerReason;
+
+                var isForced = false;
+                var isFriend = container is FriendMiraiMsgContainer;
+                var isAt = container.MessageChain.Any(x => x is At at && at.Target == Bot.BotQq);
+
+                if (isFriend || isAt)
+                {
+                    isForced = true;
+                    triggerReason = isFriend ? "私聊强制触发" : "被 @ 强制触发";
+                }
+                else
+                {
+                    triggerReason = $"随机数 {roll} >= 概率 {_config.TriggerProbability}，未触发";
+                }
+
+                // Bot自己的消息不触发发送, 只做消息总结和归纳
+                var isBot = container is MiraiMsgContainerBase baseContainer && baseContainer.Sender?.Id == Bot.BotQq;
+                if (isBot)
+                {
+                    shouldTrigger = false;
+                    isForced = false;
+                    triggerReason = "Bot 自己的消息不触发发送";
+                }
+
+                shouldTrigger = shouldTrigger || isForced;
+                Bot?.Debug($"[{uin}] 触发检查: shouldTrigger={shouldTrigger}, 原因: {triggerReason}");
+
+                // 结构化包装消息
+                var structuredMsg = JsonConvert.SerializeObject(new
+                {
+                    speaker = userName,
+                    source = container is GroupMiraiMsgContainer ? "group" : "friend",
+                    text = textMsg,
+                    emojis = string.Join(",", container.MessageChain.Where(x => x is Face).Select(x => ((Face)x).FaceName)),
+                    is_user_input = !isBot
+                });
+
+                // 更新消息计数并检查总结
+                var count = _messageCounter.AddOrUpdate(uin, 1, (_, c) => c + 1);
+                UpdateContext(uin, isBot ? "assistant" : "user", structuredMsg, count);
+
+                if (count >= _config.SummaryFrequency || !_summaryCache.ContainsKey(uin))
+                {
+                    if (_isSummaryRunning.TryAdd(uin, true))
+                    {
+                        _messageCounter[uin] = 0;
+                        _ = Task.Run(async () =>
+                        {
+                            try
+                            {
+                                await UpdateSummary(uin, _cts.Token).ConfigureAwait(false);
+                            }
+                            finally
+                            {
+                                _isSummaryRunning.TryRemove(uin, out _);
+                            }
+                        }, _cts.Token);
+                    }
+                }
+
+                // 判定是否最终触发回复
+                if (shouldTrigger)
+                {
+                    if (_summaryCache.TryGetValue(uin, out var summary))
+                    {
+                        if (summary.GroupChatStatus is { SuggestSpeech: false, SpeechNecessity: "低" } && !isForced)
+                        {
+                            shouldTrigger = false;
+                            Bot?.Debug($"[{uin}] 触发被拦截: 总结建议不发言 (SuggestSpeech=false, SpeechNecessity=低)");
+                        }
+                    }
+                }
+
+                if (shouldTrigger)
+                {
+                    // 检查冷却
+                    if (!isForced && _lastReplyTime.TryGetValue(uin, out var lastTime))
+                    {
+                        var cooldown = (DateTime.Now - lastTime).TotalSeconds;
+                        if (cooldown < _config.CooldownSeconds)
+                        {
+                            Bot?.Debug($"[{uin}] 触发被拦截: 冷却中 (当前冷却: {cooldown:F1}s, 配置: {_config.CooldownSeconds}s)");
+                            shouldTrigger = false;
+                        }
+                    }
+                }
+
+                if (shouldTrigger)
+                {
+                    anyTriggered = true;
+                    lastTriggerContainer = container;
                 }
             }
 
-            await ReplyWithAi(container, uin).ConfigureAwait(false);
+            if (anyTriggered && lastTriggerContainer != null)
+            {
+                await ReplyWithAi(lastTriggerContainer, uin).ConfigureAwait(false);
+            }
         }
     }
 
@@ -463,7 +565,7 @@ public class OllamaChatPlugin : PluginBase
 
         var messages = new List<OllamaMessage>
         {
-            new OllamaMessage {Role = "system", Content = summaryPrompt, Timestamp = DateTime.UtcNow}
+            new OllamaMessage {Role = "system", Content = summaryPrompt, Timestamp = DateTime.Now}
         };
         messages.AddRange(history);
 
@@ -537,7 +639,7 @@ public class OllamaChatPlugin : PluginBase
                 content = content.Substring(0, 2000) + "... [内容过长已截断]";
             }
 
-            messages.Add(new OllamaMessage {Role = role, Content = content, Timestamp = DateTime.UtcNow});
+            messages.Add(new OllamaMessage {Role = role, Content = content, Timestamp = DateTime.Now});
 
             // 获取当前目标的上下文限制，默认为全局配置
             var limit = _config.ContextMessageCount;
@@ -607,6 +709,10 @@ public class OllamaChatPlugin : PluginBase
         // 如果有总结信息，将其注入到对话生成中
         if (_summaryCache.TryGetValue(uin, out var summary))
         {
+            var user = summary.UserPortraits.Where(x => summary.GroupChatStatus.SuitableTarget.Contains(x.UserName)).Select(x =>
+                $"user:{x.UserName} nickname:{x.Nickname},hobby:{x.Hobby},StableStyle:{x.StableStyle},CurrentState:{x.CurrentState}");
+            var userPortraits = string.Join(",", user);
+            userPortraits = $"适合回复的对象: {userPortraits}";
             // 精简投喂给回复模型的画像信息，仅保留必要的群聊状态
             var summaryForReply = new
             {
@@ -615,7 +721,8 @@ public class OllamaChatPlugin : PluginBase
                     summary.GroupChatStatus.CurrentTopic,
                     summary.GroupChatStatus.CurrentAtmosphere,
                     summary.GroupChatStatus.InterventionMode,
-                    summary.GroupChatStatus.SuggestedLength
+                    summary.GroupChatStatus.SuggestedLength,
+                    userPortraits
                 }
             };
 
@@ -628,7 +735,7 @@ public class OllamaChatPlugin : PluginBase
 
         var messages = new List<OllamaMessage>
         {
-            new OllamaMessage {Role = "system", Content = systemPrompt, Timestamp = DateTime.UtcNow}
+            new OllamaMessage {Role = "system", Content = systemPrompt, Timestamp = DateTime.Now}
         };
         messages.AddRange(history);
 
@@ -662,20 +769,26 @@ public class OllamaChatPlugin : PluginBase
 
             if (string.IsNullOrWhiteSpace(response)) return;
 
-            // 记录AI的回复到上下文
-            UpdateContext(uin, "assistant", response, 0);
-
             // 更新上次发言时间
-            _lastReplyTime[uin] = DateTime.UtcNow;
-            // 发送回复
-            container.MessageChain = [new Plain(response)];
-            if (_ttsApiService != null && ((summary?.GroupChatStatus.TtsVoiceIsRequired ?? false) || response.Contains("<v>") || response.Contains("</v>")))
+            _lastReplyTime[uin] = DateTime.Now;
+            
+            var matchVoice = Regex.Match(response, @"<voice_intent>(.*?)</voice_intent>");
+            var voiceIntent = matchVoice.Success && matchVoice.Value.Contains("yes", StringComparison.OrdinalIgnoreCase);
+            response = MyRegex().Replace(response, "").Trim();
+
+            // 记录AI的回复到上下文
+            var labelReplace = Regex.Replace(response, @"<v>.*?</v>", "");
+            UpdateContext(uin, "assistant", labelReplace, 0);
+            container.MessageChain = [new Plain(labelReplace)];
+            Bot.Debug($"ttsApiCanUse:{_ttsApiService != null}, response: {response}, voiceIntent: {voiceIntent}");
+            if (_ttsApiService != null && voiceIntent)
             {
                 var fileName = $"tts_{Guid.NewGuid():N}.mp3";
                 var filePath = Path.Combine(Path.GetTempPath(), fileName);
                 response = response.Replace("<v>", "[").Replace("</v>", "]");
                 try
                 {
+                    Bot.Debug($"生成语音: {response}");
                     if (!await _ttsApiService.SynthesizeToFileAsync(response, filePath))
                     {
                         var plainResponse = Regex.Replace(response, @"\[.*?\]", "").Trim();
@@ -712,4 +825,7 @@ public class OllamaChatPlugin : PluginBase
         _messageSubscription?.Dispose();
         base.Remove();
     }
+
+    [GeneratedRegex(@"<voice_intent>.*?</voice_intent>")]
+    private static partial Regex MyRegex();
 }
