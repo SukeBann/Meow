@@ -115,7 +115,7 @@ public class OllamaAgentCommand : IMeowCommand
             messages.Add(new OllamaMessage
             {
                 Role = "user",
-                Content = userText,
+                Content = $"{(useVoiceReply ? "<!本次回复需要生成语音!>" : "")}{userText}",
                 Timestamp = DateTime.Now
             });
             TrimHistory(messages);

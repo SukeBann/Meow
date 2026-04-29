@@ -464,20 +464,6 @@ public partial class OllamaChatPlugin : PluginBase
                         }, _cts.Token);
                     }
                 }
-
-                // 判定是否最终触发回复
-                // if (shouldTrigger)
-                // {
-                    // if (_summaryCache.TryGetValue(uin, out var summary))
-                    // {
-                        // if (summary.GroupChatStatus is { SuggestSpeech: false, SpeechNecessity: "低" } && !isForced)
-                        // {
-                            // shouldTrigger = false;
-                            // Bot?.Debug($"[{uin}] 触发被拦截: 总结建议不发言 (SuggestSpeech=false, SpeechNecessity=低)");
-                        // }
-                    // }
-                // }
-
                 if (shouldTrigger)
                 {
                     // 检查冷却
