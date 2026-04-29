@@ -37,6 +37,9 @@
         <None Update="PluginResource\OllamaChatPlugin\system_supplement_prompt.txt">
           <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>
+        <None Update="PluginResource\OllamaChatPlugin\agent_system_prompt.txt">
+          <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
     </ItemGroup>
 
     <ItemGroup>

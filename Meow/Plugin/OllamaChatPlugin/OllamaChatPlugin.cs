@@ -240,9 +240,6 @@ public partial class OllamaChatPlugin : PluginBase
 
     public override void InjectPlugin(Core.Meow host)
     {
-        Commands.Add(new OllamaConfigCommand(_config, SaveConfig, UpdateRoleSetting));
-        Commands.Add(new OllamaClearCommand(ClearContext));
-        base.InjectPlugin(host);
         _apiService = new OllamaApiService(host, _config);
         if (_fishTtsConfig != null)
         {
@@ -252,6 +249,11 @@ public partial class OllamaChatPlugin : PluginBase
         {
             host.Info("No fish tts config found, skip tts service");
         }
+        
+        Commands.Add(new OllamaConfigCommand(_config, SaveConfig, UpdateRoleSetting));
+        Commands.Add(new OllamaClearCommand(ClearContext));
+        Commands.Add(new OllamaAgentCommand(_apiService, _ttsApiService));
+        base.InjectPlugin(host);
 
         SyncDatabaseStructure();
         LoadDataFromDb();
@@ -746,15 +748,15 @@ public partial class OllamaChatPlugin : PluginBase
         var response = await _apiService.GetChatResponseAsync(messages).ConfigureAwait(false);
         if (!string.IsNullOrEmpty(response))
         {
+            // 过滤掉模型思考过程
+            response = Regex.Replace(response, @"<think>[\s\S]*?</think>", "").Trim();
+
             // 限制回复长度，防止刷屏或风控
             if (response.Length > 1000)
             {
                 response = response.Substring(0, 1000) + "... (回复过长已截断)";
             }
-
-            // 过滤掉模型思考过程
-            response = Regex.Replace(response, @"<think>[\s\S]*?</think>", "").Trim();
-
+            
             // 过滤掉可能存在的异常字符
             response = response.Replace("\u0000", "");
 
